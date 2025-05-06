@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Điều khiển Động cơ Bước - Arduino</title>
+    <title>Điều khiển Động cơ Bước Nâng cao</title>
     <style>
         :root {
-            --primary-color: #2ecc71;
-            --danger-color: #e74c3c;
-            --warning-color: #f1c40f;
+            --primary-color: #27ae60;
+            --secondary-color: #2980b9;
+            --danger-color: #c0392b;
             --dark-color: #2c3e50;
-            --background: #ecf0f1;
+            --background: #f5f6fa;
         }
 
         body {
             font-family: 'Roboto', sans-serif;
-            max-width: 800px;
+            max-width: 1000px;
             margin: 0 auto;
             padding: 20px;
             background: var(--background);
@@ -26,85 +26,92 @@
             border-radius: 15px;
             padding: 20px;
             margin: 15px 0;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.1);
         }
 
-        .btn {
-            padding: 12px 25px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-
-        .btn-primary {
-            background: var(--primary-color);
-            color: white;
-        }
-
-        .btn-danger {
-            background: var(--danger-color);
-            color: white;
-        }
-
-        .status-indicator {
-            width: 15px;
-            height: 15px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 10px;
-        }
-
-        .connected { background: var(--primary-color); }
-        .disconnected { background: var(--danger-color); }
-
-        input[type="range"] {
-            width: 100%;
+        .control-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
             margin: 15px 0;
         }
 
-        #position {
-            font-size: 2.5em;
-            font-weight: bold;
-            color: var(--dark-color);
-            text-align: center;
-            margin: 20px 0;
+        .history-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-time {
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+
+        #historyList {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .accelerometer {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px;
+            background: #e9f5f9;
+            border-radius: 10px;
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     <div class="panel">
-        <h1>Điều khiển Động cơ Bước <span id="status" class="status-indicator disconnected"></span></h1>
-        
+        <h1><i class="fas fa-microchip"></i> ĐIỀU KHIỂN ĐỘNG CƠ BƯỚC</h1>
         <div class="panel">
-            <button id="connectBtn" class="btn btn-primary">Kết nối Arduino</button>
-            <button id="emergencyStop" class="btn btn-danger">Dừng khẩn cấp</button>
+            <button id="connectBtn" class="btn-primary"><i class="fas fa-plug"></i> Kết nối</button>
+            <button id="emergencyStop" class="btn-danger"><i class="fas fa-stop-circle"></i> Dừng khẩn</button>
+            <span id="status" class="status-indicator disconnected"></span>
+        </div>
+
+        <div class="control-group">
+            <div class="panel">
+                <label><i class="fas fa-tachometer-alt"></i> Tốc độ (%): <span id="speedValue">50</span></label>
+                <input type="range" id="speed" min="1" max="100" value="50">
+                
+                <label><i class="fas fa-redo"></i> Số vòng: <span id="revsValue">1</span></label>
+                <input type="range" id="revs" min="0.1" max="10" step="0.1" value="1">
+            </div>
+
+            <div class="panel">
+                <label><i class="fas fa-running"></i> Gia tốc (steps/s²): <span id="accelValue">1000</span></label>
+                <input type="range" id="acceleration" min="100" max="5000" value="1000">
+                
+                <label><i class="fas fa-cogs"></i> Vi bước:
+                    <select id="microstep">
+                        <option value="1">1x</option>
+                        <option value="2">2x</option>
+                        <option value="4">4x</option>
+                        <option value="8">8x</option>
+                        <option value="16">16x</option>
+                    </select>
+                </label>
+            </div>
         </div>
 
         <div class="panel">
-            <label>Tốc độ (%): <span id="speedValue">50</span></label>
-            <input type="range" id="speed" min="1" max="100" value="50">
-            
-            <label>Số vòng: <span id="revsValue">1</span></label>
-            <input type="range" id="revs" min="0.1" max="10" step="0.1" value="1">
-            
-            <label>Vi bước:
-                <select id="microstep">
-                    <option value="1">1x</option>
-                    <option value="2">2x</option>
-                    <option value="4">4x</option>
-                    <option value="8">8x</option>
-                    <option value="16">16x</option>
-                </select>
-            </label>
+            <button id="forwardBtn" class="btn-primary"><i class="fas fa-arrow-up"></i> Thuận</button>
+            <button id="reverseBtn" class="btn-primary"><i class="fas fa-arrow-down"></i> Nghịch</button>
+            <div id="position">Vị trí: 0</div>
         </div>
 
         <div class="panel">
-            <button id="forwardBtn" class="btn btn-primary">Quay Thuận</button>
-            <button id="reverseBtn" class="btn btn-primary">Quay Nghịch</button>
-            <div id="position">0</div>
+            <h3><i class="fas fa-history"></i> Lịch sử hoạt động</h3>
+            <button id="clearHistory" class="btn-secondary"><i class="fas fa-trash"></i> Xóa lịch sử</button>
+            <div id="historyList" class="history-list"></div>
         </div>
     </div>
 
@@ -112,139 +119,141 @@
         let port;
         let reader;
         let isConnected = false;
+        const commandHistory = [];
+        const MAX_HISTORY_ITEMS = 50;
 
         // Cấu hình động cơ
         const config = {
             stepsPerRev: 200,
-            maxSpeed: 1000 // steps/giây
+            maxSpeed: 2000
         };
 
         // Elements
         const connectBtn = document.getElementById('connectBtn');
         const statusIndicator = document.getElementById('status');
         const positionDisplay = document.getElementById('position');
+        const historyList = document.getElementById('historyList');
 
-        // Kết nối Serial
         async function connectSerial() {
             try {
                 port = await navigator.serial.requestPort();
                 await port.open({ baudRate: 115200 });
-                
                 reader = port.readable.getReader();
                 isConnected = true;
                 updateUI();
                 readData();
-                
-                connectBtn.textContent = "Ngắt kết nối";
-                statusIndicator.className = "status-indicator connected";
-                
+                addHistory('Kết nối thành công', 'success');
             } catch (error) {
-                console.error('Lỗi kết nối:', error);
-                alert('Lỗi kết nối: ' + error.message);
+                addHistory(`Lỗi kết nối: ${error.message}`, 'error');
             }
         }
 
-        // Đọc dữ liệu từ Arduino
         async function readData() {
             while (isConnected) {
-                try {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    
-                    const text = new TextDecoder().decode(value);
-                    processIncomingData(text);
-                    
-                } catch (error) {
-                    console.error('Lỗi đọc dữ liệu:', error);
-                    disconnect();
-                }
+                const { value, done } = await reader.read();
+                if (done) break;
+                
+                const text = new TextDecoder().decode(value);
+                processIncomingData(text);
             }
         }
 
-        // Xử lý dữ liệu nhận
         function processIncomingData(data) {
-            const messages = data.split('\n');
-            
-            messages.forEach(msg => {
-                if (msg.startsWith('POS:')) {
-                    const position = msg.substr(4).trim();
-                    positionDisplay.textContent = position;
+            data.split('\n').forEach(line => {
+                if (line.startsWith('POS:')) {
+                    positionDisplay.textContent = `Vị trí: ${line.substr(4)}`;
                 }
-                else if (msg.startsWith('ERR:')) {
-                    handleError(msg.substr(4));
+                else if (line.startsWith('ERR:')) {
+                    addHistory(line.substr(4), 'error');
                 }
             });
         }
 
-        // Gửi lệnh điều khiển
         async function sendCommand(command) {
             if (!isConnected) return;
             
             const writer = port.writable.getWriter();
             await writer.write(new TextEncoder().encode(command + '\n'));
             writer.releaseLock();
+            logCommand(command);
         }
 
-        // Xử lý lỗi
-        function handleError(errorMsg) {
-            alert(`Lỗi: ${errorMsg}`);
-            sendCommand('S');
-        }
-
-        // Ngắt kết nối
-        function disconnect() {
-            isConnected = false;
-            reader.cancel();
-            port.close();
-            updateUI();
-            connectBtn.textContent = "Kết nối Arduino";
-            statusIndicator.className = "status-indicator disconnected";
-        }
-
-        // Cập nhật giao diện
-        function updateUI() {
-            const controls = document.querySelectorAll('button, input');
-            controls.forEach(control => {
-                if (control.id !== 'connectBtn') {
-                    control.disabled = !isConnected;
-                }
+        function logCommand(cmd) {
+            const direction = cmd[0] === 'F' ? 'Thuận' : 'Nghịch';
+            const [speed, steps, accel] = cmd.substr(1).split('|');
+            
+            addHistory({
+                type: 'command',
+                direction,
+                speed: `${speed}%`,
+                steps,
+                acceleration: `${accel} steps/s²`,
+                timestamp: new Date().toLocaleTimeString()
             });
         }
 
-        // Event Listeners
-        connectBtn.addEventListener('click', () => {
-            isConnected ? disconnect() : connectSerial();
-        });
+        function addHistory(content, type = 'info') {
+            const item = document.createElement('div');
+            item.className = `history-item ${type}`;
+            
+            if (typeof content === 'object') {
+                item.innerHTML = `
+                    <div>
+                        <i class="fas fa-${content.direction === 'Thuận' ? 'arrow-up' : 'arrow-down'}"></i>
+                        ${content.direction}
+                    </div>
+                    <div>Tốc độ: ${content.speed}</div>
+                    <div>Bước: ${content.steps}</div>
+                    <div>Gia tốc: ${content.acceleration}</div>
+                    <div class="history-time">${content.timestamp}</div>
+                `;
+            } else {
+                item.innerHTML = `
+                    <div>
+                        <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : 'info-circle'}"></i>
+                        ${content}
+                    </div>
+                    <div class="history-time">${new Date().toLocaleTimeString()}</div>
+                `;
+            }
 
+            historyList.prepend(item);
+            if (historyList.children.length > MAX_HISTORY_ITEMS) {
+                historyList.lastChild.remove();
+            }
+        }
+
+        // Event Listeners
         document.getElementById('forwardBtn').addEventListener('click', () => {
             const speed = document.getElementById('speed').value;
             const revs = document.getElementById('revs').value;
             const microstep = document.getElementById('microstep').value;
+            const acceleration = document.getElementById('acceleration').value;
             const steps = revs * config.stepsPerRev * microstep;
             
-            sendCommand(`F${speed}|${steps}`);
+            sendCommand(`F${speed}|${steps}|${acceleration}`);
         });
 
         document.getElementById('reverseBtn').addEventListener('click', () => {
             const speed = document.getElementById('speed').value;
             const revs = document.getElementById('revs').value;
             const microstep = document.getElementById('microstep').value;
+            const acceleration = document.getElementById('acceleration').value;
             const steps = revs * config.stepsPerRev * microstep;
             
-            sendCommand(`R${speed}|${steps}`);
+            sendCommand(`R${speed}|${steps}|${acceleration}`);
         });
 
-        document.getElementById('emergencyStop').addEventListener('click', () => {
-            sendCommand('S');
+        document.getElementById('clearHistory').addEventListener('click', () => {
+            historyList.innerHTML = '';
+            addHistory('Đã xóa lịch sử', 'info');
         });
 
         // Cập nhật giá trị real-time
-        document.getElementById('speed').addEventListener('input', (e) => {
-            document.getElementById('speedValue').textContent = e.target.value;
-        });
-
-        document.getElementById('revs').addEventListener('input', (e) => {
-            document.getElementById('revsValue').textContent = e.target.value;
+        document.querySelectorAll('input[type="range"]').forEach(input => {
+            input.addEventListener('input', e => {
+                document.getElementById(e.target.id + 'Value').textContent = e.target.value;
+            });
         });
     </script>
 </body>
