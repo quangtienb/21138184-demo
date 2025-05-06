@@ -3,198 +3,492 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Điều khiển Động cơ Bước Hoàn chỉnh</title>
+    <title>Điều khiển Động cơ Bước Nâng cao</title>
     <style>
+        :root {
+            --primary-color: #3498db;
+            --primary-hover: #2980b9;
+            --success-color: #27ae60;
+            --success-hover: #219653;
+            --danger-color: #e74c3c;
+            --danger-hover: #c0392b;
+            --warning-color: #f39c12;
+            --warning-hover: #e67e22;
+            --dark-color: #2c3e50;
+            --light-color: #ecf0f1;
+            --gray-color: #95a5a6;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 800px;
+            max-width: 1000px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #f9f9f9;
+            background-color: #f5f7fa;
             color: #333;
+            line-height: 1.6;
         }
+        
         h1 {
-            color: #2c3e50;
+            color: var(--dark-color);
             text-align: center;
-            margin-bottom: 30px;
+            margin: 20px 0 30px;
+            font-size: 2.2rem;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
         }
-        .control-panel {
-            background-color: #fff;
-            border-radius: 10px;
+        
+        .panel {
+            background-color: white;
+            border-radius: 12px;
             padding: 25px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            margin-bottom: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s, box-shadow 0.3s;
         }
+        
+        .panel:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+        }
+        
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--light-color);
+        }
+        
+        .panel-title {
+            color: var(--primary-color);
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin: 0;
+        }
+        
         .control-group {
-            margin-bottom: 20px;
-            padding: 15px;
-            background-color: #f5f5f5;
-            border-radius: 8px;
+            margin-bottom: 25px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid var(--primary-color);
         }
+        
         .control-group h3 {
-            margin-top: 0;
-            color: #3498db;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 8px;
+            color: var(--dark-color);
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
         }
-        button {
-            background-color: #3498db;
+        
+        .control-group h3 i {
+            margin-right: 10px;
+            color: var(--primary-color);
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--primary-color);
             color: white;
             border: none;
             padding: 12px 24px;
             margin: 8px;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 16px;
-            transition: all 0.3s;
-            min-width: 120px;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            min-width: 140px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
-        button:hover {
-            background-color: #2980b9;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
-        button:disabled {
-            background-color: #95a5a6;
+        
+        .btn:active {
+            transform: translateY(1px);
+        }
+        
+        .btn:disabled {
+            background-color: var(--gray-color);
             cursor: not-allowed;
             transform: none;
             box-shadow: none;
         }
-        button.danger {
-            background-color: #e74c3c;
+        
+        .btn i {
+            margin-right: 8px;
         }
-        button.danger:hover {
-            background-color: #c0392b;
+        
+        .btn-success {
+            background-color: var(--success-color);
         }
-        button.success {
-            background-color: #27ae60;
+        
+        .btn-success:hover {
+            background-color: var(--success-hover);
         }
-        button.success:hover {
-            background-color: #219653;
+        
+        .btn-danger {
+            background-color: var(--danger-color);
         }
+        
+        .btn-danger:hover {
+            background-color: var(--danger-hover);
+        }
+        
+        .btn-warning {
+            background-color: var(--warning-color);
+        }
+        
+        .btn-warning:hover {
+            background-color: var(--warning-hover);
+        }
+        
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 15px 0;
+        }
+        
         label {
             display: block;
             margin-bottom: 8px;
             font-weight: 500;
+            color: var(--dark-color);
         }
-        input[type="range"] {
+        
+        .input-range {
             width: 100%;
-            height: 8px;
-            border-radius: 4px;
+            margin: 15px 0;
+            -webkit-appearance: none;
+            height: 10px;
+            border-radius: 5px;
             background: #ddd;
             outline: none;
-            margin-bottom: 10px;
         }
+        
+        .input-range::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .input-range::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            background: var(--primary-hover);
+        }
+        
         select {
             width: 100%;
-            padding: 10px;
-            border-radius: 6px;
+            padding: 12px;
+            border-radius: 8px;
             border: 1px solid #ddd;
             background-color: white;
-            font-size: 16px;
-            margin-bottom: 10px;
+            font-size: 1rem;
+            margin-bottom: 15px;
+            transition: border 0.3s;
         }
+        
+        select:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+        
         .value-display {
-            font-weight: bold;
-            color: #2c3e50;
-            font-size: 18px;
+            font-weight: 600;
+            color: var(--dark-color);
+            font-size: 1.1rem;
+            margin-left: 5px;
         }
-        #status {
-            padding: 15px;
-            background-color: #e8f4fc;
-            border-radius: 8px;
-            margin: 20px 0;
-            font-size: 18px;
-            text-align: center;
-        }
-        #position-display {
-            padding: 15px;
-            background-color: #e8f8f0;
-            border-radius: 8px;
-            margin: 20px 0;
-            font-size: 20px;
-            text-align: center;
-        }
-        #command-history {
-            background-color: #fff;
-            border-radius: 10px;
+        
+        .status-panel {
             padding: 20px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            background-color: #e8f4fc;
+            border-radius: 10px;
+            margin: 25px 0;
+            font-size: 1.1rem;
+            text-align: center;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
         }
-        #history-list {
-            max-height: 200px;
+        
+        .status-item {
+            margin: 10px;
+            padding: 10px 15px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            min-width: 200px;
+        }
+        
+        .position-display {
+            padding: 25px;
+            background-color: #e8f8f0;
+            border-radius: 10px;
+            margin: 25px 0;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .position-display::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--success-color), var(--primary-color));
+        }
+        
+        .position-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--dark-color);
+            margin: 10px 0;
+            transition: color 0.3s;
+        }
+        
+        .position-label {
+            font-size: 1rem;
+            color: var(--gray-color);
+        }
+        
+        .connection-status {
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 25px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .connection-status i {
+            margin-right: 10px;
+            font-size: 1.3rem;
+        }
+        
+        .connected {
+            background-color: #d5f5e3;
+            color: var(--success-color);
+        }
+        
+        .disconnected {
+            background-color: #fadbd8;
+            color: var(--danger-color);
+        }
+        
+        .history-panel {
+            position: relative;
+        }
+        
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .history-list {
+            max-height: 300px;
             overflow-y: auto;
             padding: 0;
             list-style-type: none;
+            border-radius: 8px;
+            border: 1px solid #eee;
         }
-        #history-list li {
-            padding: 10px;
+        
+        .history-list li {
+            padding: 12px 15px;
             border-bottom: 1px solid #eee;
-        }
-        #history-list li:nth-child(odd) {
-            background-color: #f9f9f9;
-        }
-        .connection-status {
-            padding: 10px;
-            border-radius: 5px;
-            text-align: center;
-            margin-bottom: 20px;
-            font-weight: bold;
-        }
-        .connected {
-            background-color: #d5f5e3;
-            color: #27ae60;
-        }
-        .disconnected {
-            background-color: #fadbd8;
-            color: #e74c3c;
-        }
-        .flex-container {
             display: flex;
             justify-content: space-between;
-            flex-wrap: wrap;
+            align-items: center;
+            transition: background-color 0.2s;
         }
+        
+        .history-list li:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .history-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .history-time {
+            color: var(--gray-color);
+            font-size: 0.9rem;
+        }
+        
+        .history-command {
+            font-weight: 500;
+        }
+        
+        .flex-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        
         .flex-item {
             flex: 1;
-            min-width: 250px;
-            margin: 10px;
+            min-width: 300px;
+        }
+        
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .panel {
+                padding: 15px;
+            }
+            
+            .btn {
+                padding: 10px 15px;
+                min-width: 120px;
+                font-size: 0.9rem;
+            }
+            
+            .flex-container {
+                flex-direction: column;
+            }
+            
+            .status-item {
+                min-width: 100%;
+            }
+        }
+        
+        /* Animation */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        /* Connection indicator */
+        .indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .indicator.connected {
+            background-color: var(--success-color);
+            box-shadow: 0 0 10px var(--success-color);
+        }
+        
+        .indicator.disconnected {
+            background-color: var(--danger-color);
+        }
+        
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
-    <h1>ĐIỀU KHIỂN ĐỘNG CƠ BƯỚC</h1>
+    <h1><i class="fas fa-cogs"></i> ĐIỀU KHIỂN ĐỘNG CƠ BƯỚC</h1>
     
     <div id="connection-status" class="connection-status disconnected">
-        Chưa kết nối với thiết bị
+        <span class="indicator disconnected"></span>
+        <span id="connection-text">Chưa kết nối với thiết bị</span>
     </div>
     
-    <div class="control-panel">
+    <div class="panel">
+        <div class="panel-header">
+            <h2 class="panel-title"><i class="fas fa-sliders-h"></i> Cấu hình điều khiển</h2>
+            <div class="btn-group">
+                <button id="connect-btn" class="btn btn-success">
+                    <i class="fas fa-plug"></i> Kết nối Serial
+                </button>
+                <button id="wifi-btn" class="btn btn-warning">
+                    <i class="fas fa-wifi"></i> Kết nối WiFi
+                </button>
+            </div>
+        </div>
+        
         <div class="flex-container">
             <div class="flex-item">
                 <div class="control-group">
-                    <h3>Điều khiển cơ bản</h3>
-                    <button id="forward-btn" class="success">Quay Thuận</button>
-                    <button id="stop-btn">Dừng</button>
-                    <button id="reverse-btn" class="danger">Quay Nghịch</button>
+                    <h3><i class="fas fa-gamepad"></i> Điều khiển cơ bản</h3>
+                    <div class="btn-group">
+                        <button id="forward-btn" class="btn btn-success">
+                            <i class="fas fa-forward"></i> Quay Thuận
+                        </button>
+                        <button id="stop-btn" class="btn">
+                            <i class="fas fa-stop"></i> Dừng
+                        </button>
+                        <button id="reverse-btn" class="btn btn-danger">
+                            <i class="fas fa-backward"></i> Quay Nghịch
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="control-group">
-                    <h3>Thông số động cơ</h3>
-                    <label for="speed">Tốc độ: <span id="speed-value" class="value-display">50</span>%</label>
-                    <input type="range" id="speed" min="1" max="100" value="50">
+                    <h3><i class="fas fa-tachometer-alt"></i> Thông số động cơ</h3>
+                    <label for="speed">
+                        <i class="fas fa-speed"></i> Tốc độ: 
+                        <span id="speed-value" class="value-display">50</span>%
+                    </label>
+                    <input type="range" class="input-range" id="speed" min="1" max="100" value="50">
                     
-                    <label for="steps">Số bước/vòng: <span id="steps-value" class="value-display">200</span></label>
-                    <input type="range" id="steps" min="1" max="400" value="200">
+                    <label for="steps">
+                        <i class="fas fa-ruler"></i> Số bước/vòng: 
+                        <span id="steps-value" class="value-display">200</span>
+                    </label>
+                    <input type="range" class="input-range" id="steps" min="1" max="400" value="200">
                     
-                    <label for="revolutions">Số vòng: <span id="revs-value" class="value-display">1</span></label>
-                    <input type="range" id="revolutions" min="0.1" max="10" step="0.1" value="1">
+                    <label for="revolutions">
+                        <i class="fas fa-redo"></i> Số vòng: 
+                        <span id="revs-value" class="value-display">1</span>
+                    </label>
+                    <input type="range" class="input-range" id="revolutions" min="0.1" max="10" step="0.1" value="1">
                 </div>
             </div>
             
             <div class="flex-item">
                 <div class="control-group">
-                    <h3>Cấu hình nâng cao</h3>
-                    <label for="microstep">Chế độ vi bước:</label>
+                    <h3><i class="fas fa-cog"></i> Cấu hình nâng cao</h3>
+                    <label for="microstep"><i class="fas fa-microchip"></i> Chế độ vi bước:</label>
                     <select id="microstep">
                         <option value="1">Full step (1x)</option>
                         <option value="2">Half step (2x)</option>
@@ -203,30 +497,77 @@
                         <option value="16">1/16 step (16x)</option>
                     </select>
                     
-                    <label for="acceleration">Gia tốc: <span id="accel-value" class="value-display">500</span> bước/s²</label>
-                    <input type="range" id="acceleration" min="100" max="2000" value="500">
+                    <label for="acceleration">
+                        <i class="fas fa-running"></i> Gia tốc: 
+                        <span id="accel-value" class="value-display">500</span> bước/s²
+                    </label>
+                    <input type="range" class="input-range" id="acceleration" min="100" max="2000" value="500">
                 </div>
                 
-                <div id="position-display">
-                    <div>Vị trí hiện tại:</div>
-                    <div id="current-position" class="value-display" style="font-size: 24px;">0</div>
-                    <div>bước</div>
-                    <button id="reset-position">Reset vị trí</button>
+                <div class="position-display">
+                    <div class="position-label"><i class="fas fa-map-marker-alt"></i> Vị trí hiện tại</div>
+                    <div id="current-position" class="position-value">0</div>
+                    <div class="position-label">bước</div>
+                    <button id="reset-position" class="btn">
+                        <i class="fas fa-undo"></i> Reset vị trí
+                    </button>
                 </div>
             </div>
         </div>
         
-        <div id="status">
-            Trạng thái: <span id="state-text">Đang dừng</span> | 
-            Tốc độ: <span id="speed-text">50%</span> | 
-            Vi bước: <span id="microstep-text">1x</span>
+        <div class="status-panel">
+            <div class="status-item">
+                <i class="fas fa-info-circle"></i> Trạng thái: 
+                <span id="state-text" class="value-display">Đang dừng</span>
+            </div>
+            <div class="status-item">
+                <i class="fas fa-tachometer-alt"></i> Tốc độ: 
+                <span id="speed-text" class="value-display">50%</span>
+            </div>
+            <div class="status-item">
+                <i class="fas fa-microchip"></i> Vi bước: 
+                <span id="microstep-text" class="value-display">1x</span>
+            </div>
         </div>
     </div>
     
-    <div id="command-history">
-        <h3>Lịch sử lệnh</h3>
-        <button id="clear-history">Xóa lịch sử</button>
-        <ul id="history-list"></ul>
+    <div class="panel history-panel">
+        <div class="panel-header">
+            <h2 class="panel-title"><i class="fas fa-history"></i> Lịch sử lệnh</h2>
+            <div>
+                <button id="clear-history" class="btn">
+                    <i class="fas fa-trash-alt"></i> Xóa lịch sử
+                </button>
+                <button id="save-log-btn" class="btn">
+                    <i class="fas fa-save"></i> Lưu nhật ký
+                </button>
+            </div>
+        </div>
+        
+        <ul id="history-list" class="history-list"></ul>
+    </div>
+
+    <!-- WiFi Connection Modal -->
+    <div id="wifi-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2><i class="fas fa-wifi"></i> Kết nối WiFi</h2>
+            <div class="form-group">
+                <label for="wifi-ssid">Tên WiFi (SSID):</label>
+                <input type="text" id="wifi-ssid" placeholder="Nhập tên WiFi">
+            </div>
+            <div class="form-group">
+                <label for="wifi-password">Mật khẩu:</label>
+                <input type="password" id="wifi-password" placeholder="Nhập mật khẩu">
+            </div>
+            <div class="form-group">
+                <label for="device-ip">Địa chỉ IP thiết bị:</label>
+                <input type="text" id="device-ip" placeholder="192.168.1.100">
+            </div>
+            <button id="connect-wifi-btn" class="btn btn-success">
+                <i class="fas fa-plug"></i> Kết nối
+            </button>
+        </div>
     </div>
 
     <script>
@@ -236,6 +577,10 @@
         const reverseBtn = document.getElementById('reverse-btn');
         const resetBtn = document.getElementById('reset-position');
         const clearHistoryBtn = document.getElementById('clear-history');
+        const saveLogBtn = document.getElementById('save-log-btn');
+        const connectBtn = document.getElementById('connect-btn');
+        const wifiBtn = document.getElementById('wifi-btn');
+        const wifiModal = document.getElementById('wifi-modal');
         
         const speedSlider = document.getElementById('speed');
         const stepsSlider = document.getElementById('steps');
@@ -254,134 +599,222 @@
         const positionDisplay = document.getElementById('current-position');
         const historyList = document.getElementById('history-list');
         const connectionStatus = document.getElementById('connection-status');
+        const connectionText = document.getElementById('connection-text');
+        const connectionIndicator = connectionStatus.querySelector('.indicator');
         
         // State variables
         let currentState = 'stop';
         let currentPosition = 0;
         let isConnected = false;
+        let connectionType = null; // 'serial' or 'wifi'
         let port = null;
+        let wifiSocket = null;
         
         // Initialize
         updateDisplays();
         loadSettings();
+        setupEventListeners();
         
-        // Event Listeners
-        speedSlider.addEventListener('input', function() {
-            speedValue.textContent = this.value;
-            speedText.textContent = this.value + '%';
-            saveSettings();
-        });
+        function setupEventListeners() {
+            // Sliders and selects
+            speedSlider.addEventListener('input', updateSpeedDisplay);
+            stepsSlider.addEventListener('input', updateStepsDisplay);
+            revsSlider.addEventListener('input', updateRevsDisplay);
+            accelSlider.addEventListener('input', updateAccelDisplay);
+            microstepSelect.addEventListener('change', updateMicrostepDisplay);
+            
+            // Control buttons
+            forwardBtn.addEventListener('click', moveForward);
+            stopBtn.addEventListener('click', stopMotor);
+            reverseBtn.addEventListener('click', moveReverse);
+            resetBtn.addEventListener('click', resetPosition);
+            clearHistoryBtn.addEventListener('click', clearHistory);
+            saveLogBtn.addEventListener('click', saveLog);
+            
+            // Connection buttons
+            connectBtn.addEventListener('click', toggleSerialConnection);
+            wifiBtn.addEventListener('click', showWifiModal);
+            
+            // WiFi modal
+            document.getElementById('connect-wifi-btn').addEventListener('click', connectWifi);
+            document.querySelector('.close').addEventListener('click', () => {
+                wifiModal.style.display = 'none';
+            });
+            
+            // Close modal when clicking outside
+            window.addEventListener('click', (event) => {
+                if (event.target === wifiModal) {
+                    wifiModal.style.display = 'none';
+                }
+            });
+        }
         
-        stepsSlider.addEventListener('input', function() {
-            stepsValue.textContent = this.value;
-            saveSettings();
-        });
-        
-        revsSlider.addEventListener('input', function() {
-            revsValue.textContent = this.value;
-            saveSettings();
-        });
-        
-        accelSlider.addEventListener('input', function() {
-            accelValue.textContent = this.value;
-            saveSettings();
-        });
-        
-        microstepSelect.addEventListener('change', function() {
-            microstepText.textContent = this.options[this.selectedIndex].text;
-            saveSettings();
-        });
-        
-        forwardBtn.addEventListener('click', function() {
-            currentState = 'forward';
-            updateStatus();
-            sendCommand('F');
-        });
-        
-        stopBtn.addEventListener('click', function() {
-            currentState = 'stop';
-            updateStatus();
-            sendCommand('S');
-        });
-        
-        reverseBtn.addEventListener('click', function() {
-            currentState = 'reverse';
-            updateStatus();
-            sendCommand('R');
-        });
-        
-        resetBtn.addEventListener('click', function() {
-            currentPosition = 0;
-            positionDisplay.textContent = currentPosition;
-            sendCommand('P0');
-            addToHistory('Reset vị trí về 0');
-        });
-        
-        clearHistoryBtn.addEventListener('click', function() {
-            historyList.innerHTML = '';
-        });
-        
-        // Connect Serial button
-        const connectBtn = document.createElement('button');
-        connectBtn.textContent = 'Kết nối Serial';
-        connectBtn.className = 'success';
-        connectBtn.style.margin = '10px auto';
-        connectBtn.style.display = 'block';
-        connectBtn.addEventListener('click', connectSerial);
-        document.querySelector('.control-panel').prepend(connectBtn);
-        
-        // Functions
         function updateDisplays() {
-            speedValue.textContent = speedSlider.value;
-            stepsValue.textContent = stepsSlider.value;
-            revsValue.textContent = revsSlider.value;
-            accelValue.textContent = accelSlider.value;
-            microstepText.textContent = microstepSelect.options[microstepSelect.selectedIndex].text;
+            updateSpeedDisplay();
+            updateStepsDisplay();
+            updateRevsDisplay();
+            updateAccelDisplay();
+            updateMicrostepDisplay();
             updateStatus();
+        }
+        
+        function updateSpeedDisplay() {
+            speedValue.textContent = speedSlider.value;
+            speedText.textContent = speedSlider.value + '%';
+            saveSettings();
+        }
+        
+        function updateStepsDisplay() {
+            stepsValue.textContent = stepsSlider.value;
+            saveSettings();
+        }
+        
+        function updateRevsDisplay() {
+            revsValue.textContent = revsSlider.value;
+            saveSettings();
+        }
+        
+        function updateAccelDisplay() {
+            accelValue.textContent = accelSlider.value;
+            saveSettings();
+        }
+        
+        function updateMicrostepDisplay() {
+            const selectedOption = microstepSelect.options[microstepSelect.selectedIndex];
+            microstepText.textContent = selectedOption.text;
+            saveSettings();
         }
         
         function updateStatus() {
             let status = '';
             switch(currentState) {
-                case 'forward': status = 'Đang quay thuận'; break;
-                case 'reverse': status = 'Đang quay nghịch'; break;
-                default: status = 'Đang dừng';
+                case 'forward': 
+                    status = 'Đang quay thuận';
+                    positionDisplay.style.color = 'var(--success-color)';
+                    break;
+                case 'reverse': 
+                    status = 'Đang quay nghịch';
+                    positionDisplay.style.color = 'var(--danger-color)';
+                    break;
+                default: 
+                    status = 'Đang dừng';
+                    positionDisplay.style.color = 'var(--dark-color)';
             }
             stateText.textContent = status;
         }
         
-        function addToHistory(command) {
+        function addToHistory(command, isError = false) {
             const now = new Date();
             const timeString = now.toLocaleTimeString();
             const listItem = document.createElement('li');
-            listItem.textContent = `[${timeString}] ${command}`;
+            
+            if (isError) {
+                listItem.innerHTML = `
+                    <span class="history-time">[${timeString}]</span>
+                    <span class="history-command" style="color: var(--danger-color)">
+                        <i class="fas fa-exclamation-circle"></i> ${command}
+                    </span>
+                `;
+            } else {
+                listItem.innerHTML = `
+                    <span class="history-time">[${timeString}]</span>
+                    <span class="history-command">${command}</span>
+                `;
+            }
+            
             historyList.prepend(listItem);
+            
+            // Auto-scroll to top
+            historyList.scrollTop = 0;
+            
+            // Limit history to 100 items
+            if (historyList.children.length > 100) {
+                historyList.removeChild(historyList.lastChild);
+            }
+        }
+        
+        async function toggleSerialConnection() {
+            if (isConnected && connectionType === 'serial') {
+                await disconnectSerial();
+            } else {
+                await connectSerial();
+            }
         }
         
         async function connectSerial() {
             try {
+                // Check if browser supports Web Serial API
+                if (!('serial' in navigator)) {
+                    throw new Error('Trình duyệt không hỗ trợ Web Serial API');
+                }
+                
+                connectBtn.disabled = true;
+                connectBtn.innerHTML = '<i class="fas fa-spinner spinner"></i> Đang kết nối...';
+                
                 port = await navigator.serial.requestPort();
                 await port.open({ baudRate: 9600 });
                 
                 isConnected = true;
-                connectionStatus.textContent = 'Đã kết nối với thiết bị';
-                connectionStatus.className = 'connection-status connected';
-                connectBtn.textContent = 'Ngắt kết nối';
-                connectBtn.removeEventListener('click', connectSerial);
-                connectBtn.addEventListener('click', disconnectSerial);
+                connectionType = 'serial';
+                updateConnectionStatus();
+                
+                connectBtn.innerHTML = '<i class="fas fa-plug"></i> Ngắt kết nối';
+                connectBtn.disabled = false;
                 
                 addToHistory('Kết nối serial thành công');
                 
-                // Listen to data from serial port
+                // Listen to incoming data
                 const reader = port.readable.getReader();
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    console.log('Nhận từ thiết bị:', new TextDecoder().decode(value));
-                }
+                listenToSerialData(reader);
+                
             } catch (err) {
                 console.error('Lỗi kết nối serial:', err);
-                addToHistory('Lỗi kết nối: ' + err.message);
+                addToHistory('Lỗi kết nối serial: ' + err.message, true);
+                
+                connectBtn.innerHTML = '<i class="fas fa-plug"></i> Kết nối Serial';
+                connectBtn.disabled = false;
+                
+                if (port) {
+                    try {
+                        await port.close();
+                    } catch (e) {
+                        console.error('Lỗi khi đóng cổng serial:', e);
+                    }
+                    port = null;
+                }
+            }
+        }
+        
+        async function listenToSerialData(reader) {
+            try {
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) {
+                        reader.releaseLock();
+                        break;
+                    }
+                    
+                    const text = new TextDecoder().decode(value);
+                    console.log('Nhận từ thiết bị:', text);
+                    
+                    // Process incoming data here
+                    // Example: Update position from device feedback
+                    if (text.startsWith('POS:')) {
+                        const newPos = parseInt(text.substring(4));
+                        if (!isNaN(newPos)) {
+                            currentPosition = newPos;
+                            positionDisplay.textContent = currentPosition;
+                            positionDisplay.classList.add('pulse');
+                            setTimeout(() => {
+                                positionDisplay.classList.remove('pulse');
+                            }, 500);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Lỗi khi đọc dữ liệu serial:', err);
+                addToHistory('Lỗi kết nối serial: ' + err.message, true);
+                disconnectSerial();
             }
         }
         
@@ -391,17 +824,86 @@
                     await port.close();
                     addToHistory('Đã ngắt kết nối serial');
                 } catch (err) {
-                    console.error('Lỗi khi ngắt kết nối:', err);
+                    console.error('Lỗi khi ngắt kết nối serial:', err);
+                    addToHistory('Lỗi khi ngắt kết nối serial', true);
                 }
                 port = null;
             }
             
             isConnected = false;
-            connectionStatus.textContent = 'Chưa kết nối với thiết bị';
-            connectionStatus.className = 'connection-status disconnected';
-            connectBtn.textContent = 'Kết nối Serial';
-            connectBtn.removeEventListener('click', disconnectSerial);
-            connectBtn.addEventListener('click', connectSerial);
+            connectionType = null;
+            updateConnectionStatus();
+            
+            connectBtn.innerHTML = '<i class="fas fa-plug"></i> Kết nối Serial';
+            connectBtn.disabled = false;
+        }
+        
+        function showWifiModal() {
+            wifiModal.style.display = 'block';
+        }
+        
+        async function connectWifi() {
+            const ssid = document.getElementById('wifi-ssid').value;
+            const password = document.getElementById('wifi-password').value;
+            const deviceIp = document.getElementById('device-ip').value;
+            
+            if (!ssid || !deviceIp) {
+                addToHistory('Vui lòng nhập SSID và địa chỉ IP', true);
+                return;
+            }
+            
+            try {
+                wifiBtn.disabled = true;
+                wifiBtn.innerHTML = '<i class="fas fa-spinner spinner"></i> Đang kết nối...';
+                
+                // In a real app, you would use WebSocket or HTTP to connect
+                // This is just a simulation
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                isConnected = true;
+                connectionType = 'wifi';
+                updateConnectionStatus();
+                
+                wifiModal.style.display = 'none';
+                wifiBtn.innerHTML = '<i class="fas fa-wifi"></i> Ngắt kết nối WiFi';
+                wifiBtn.disabled = false;
+                
+                addToHistory(`Đã kết nối WiFi đến ${deviceIp}`);
+                
+            } catch (err) {
+                console.error('Lỗi kết nối WiFi:', err);
+                addToHistory('Lỗi kết nối WiFi: ' + err.message, true);
+                
+                wifiBtn.innerHTML = '<i class="fas fa-wifi"></i> Kết nối WiFi';
+                wifiBtn.disabled = false;
+            }
+        }
+        
+        function updateConnectionStatus() {
+            if (isConnected) {
+                connectionStatus.className = 'connection-status connected';
+                connectionIndicator.className = 'indicator connected';
+                connectionText.textContent = connectionType === 'serial' 
+                    ? 'Đã kết nối serial' 
+                    : `Đã kết nối WiFi`;
+                
+                // Enable controls
+                forwardBtn.disabled = false;
+                stopBtn.disabled = false;
+                reverseBtn.disabled = false;
+                resetBtn.disabled = false;
+                
+            } else {
+                connectionStatus.className = 'connection-status disconnected';
+                connectionIndicator.className = 'indicator disconnected';
+                connectionText.textContent = 'Chưa kết nối với thiết bị';
+                
+                // Disable controls
+                forwardBtn.disabled = true;
+                stopBtn.disabled = true;
+                reverseBtn.disabled = true;
+                resetBtn.disabled = true;
+            }
         }
         
         async function sendCommand(cmd) {
@@ -436,18 +938,81 @@
                 addToHistory(`Đặt vị trí về ${currentPosition}`);
             }
             
-            // Send to serial if connected
-            if (isConnected && port) {
+            // Send command based on connection type
+            if (isConnected) {
                 try {
-                    const writer = port.writable.getWriter();
-                    await writer.write(new TextEncoder().encode(fullCommand));
-                    writer.releaseLock();
+                    if (connectionType === 'serial' && port) {
+                        const writer = port.writable.getWriter();
+                        await writer.write(new TextEncoder().encode(fullCommand));
+                        writer.releaseLock();
+                    } 
+                    else if (connectionType === 'wifi') {
+                        // In a real app, you would send via WebSocket or HTTP
+                        console.log('Gửi lệnh WiFi:', fullCommand.trim());
+                    }
                 } catch (err) {
                     console.error('Lỗi gửi lệnh:', err);
-                    addToHistory('Lỗi gửi lệnh: ' + err.message);
-                    disconnectSerial();
+                    addToHistory('Lỗi gửi lệnh: ' + err.message, true);
+                    
+                    if (connectionType === 'serial') {
+                        disconnectSerial();
+                    }
                 }
             }
+        }
+        
+        function moveForward() {
+            currentState = 'forward';
+            updateStatus();
+            sendCommand('F');
+        }
+        
+        function stopMotor() {
+            currentState = 'stop';
+            updateStatus();
+            sendCommand('S');
+        }
+        
+        function moveReverse() {
+            currentState = 'reverse';
+            updateStatus();
+            sendCommand('R');
+        }
+        
+        function resetPosition() {
+            currentPosition = 0;
+            positionDisplay.textContent = currentPosition;
+            sendCommand('P0');
+            addToHistory('Reset vị trí về 0');
+        }
+        
+        function clearHistory() {
+            historyList.innerHTML = '';
+            addToHistory('Đã xóa lịch sử lệnh');
+        }
+        
+        function saveLog() {
+            // In a real app, this would save the log to a file
+            let logContent = "Lịch sử điều khiển động cơ bước\n\n";
+            const items = historyList.querySelectorAll('li');
+            
+            items.forEach(item => {
+                logContent += item.textContent + '\n';
+            });
+            
+            console.log('Lưu nhật ký:', logContent);
+            addToHistory('Đã lưu nhật ký điều khiển');
+            
+            // Create download link
+            const blob = new Blob([logContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `motor_control_log_${new Date().toISOString().slice(0,10)}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
         
         function saveSettings() {
@@ -457,7 +1022,8 @@
                 revs: revsSlider.value,
                 microstep: microstepSelect.value,
                 accel: accelSlider.value,
-                position: currentPosition
+                position: currentPosition,
+                connectionType: connectionType
             };
             localStorage.setItem('motorControlSettings', JSON.stringify(settings));
         }
@@ -471,6 +1037,7 @@
                 microstepSelect.value = saved.microstep || 1;
                 accelSlider.value = saved.accel || 500;
                 currentPosition = saved.position || 0;
+                connectionType = saved.connectionType || null;
                 
                 positionDisplay.textContent = currentPosition;
                 updateDisplays();
