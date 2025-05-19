@@ -1,163 +1,173 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Remote Camera Login</title>
+    <title>Remote Camera Control</title>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            text-align: center;
+            max-width: 800px;
+            margin: 0 auto;
             padding: 20px;
+            text-align: center;
         }
-        /* UI cho điện thoại */
-        #mobileUI {
+        .container {
             display: none;
-            max-width: 500px;
-            margin: 0 auto;
-        }
-        /* UI cho máy tính */
-        #desktopUI {
-            display: none;
-            max-width: 500px;
-            margin: 0 auto;
-        }
-        #peerId {
-            font-size: 1.2em;
-            color: #2c3e50;
-            margin: 20px;
-            word-break: break-all;
+            margin: 20px 0;
         }
         video {
             width: 100%;
+            max-width: 500px;
             border-radius: 10px;
             background: #000;
         }
-        input, button {
-            padding: 12px;
-            margin: 10px;
-            font-size: 16px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-        button {
-            background: #3498db;
-            color: white;
-            cursor: pointer;
-        }
-        #qrBox {
-            margin: 20px auto;
-            padding: 15px;
-            background: white;
+        #providerSection {
+            background: #f5f5f5;
+            padding: 20px;
             border-radius: 10px;
-            display: inline-block;
+        }
+        #captureSection {
+            margin-top: 20px;
+        }
+        canvas {
+            border: 1px solid #ddd;
+            margin: 10px;
         }
     </style>
 </head>
 <body>
-    <!-- Giao diện điện thoại -->
-    <div id="mobileUI">
-        <h2>📱 Điện Thoại</h2>
+    <!-- Provider Section -->
+    <div id="providerSection">
+        <h2>Thiết bị Camera (Provider)</h2>
+        <div id="providerIdDisplay"></div>
+        <div id="qrCodeContainer"></div>
         <video id="localVideo" autoplay playsinline muted></video>
-        <div id="connectionInfo">
-            <p>ID của bạn:</p>
-            <div id="peerId">Đang tạo ID...</div>
-            <div id="qrBox"></div>
-            <button onclick="copyID()">Sao chép ID</button>
+    </div>
+
+    <!-- Client Section -->
+    <div id="clientSection" class="container">
+        <h2>Thiết bị Điều khiển (Client)</h2>
+        <input type="text" id="providerIdInput" placeholder="Nhập ID Provider">
+        <button onclick="connectToProvider()">Kết nối</button>
+        <video id="remoteVideo" autoplay playsinline></video>
+        <div id="captureSection">
+            <button onclick="capturePhoto()">Chụp Ảnh</button>
+            <canvas id="photoCanvas"></canvas>
         </div>
     </div>
 
-    <!-- Giao diện máy tính -->
-    <div id="desktopUI">
-        <h2>🖥 Máy Tính</h2>
-        <input type="text" id="inputID" placeholder="Nhập ID điện thoại">
-        <button onclick="connect()">Kết nối</button>
-        <video id="remoteVideo"></video>
-    </div>
-
     <script>
-        // Phát hiện thiết bị
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        const mobileUI = document.getElementById('mobileUI');
-        const desktopUI = document.getElementById('desktopUI');
-        
-        if(isMobile) {
-            mobileUI.style.display = 'block';
-            initPhone();
-        } else {
-            desktopUI.style.display = 'block';
+        let peer;
+        let localStream;
+        let remoteStream;
+        let isProvider = false;
+
+        // Khởi tạo ứng dụng
+        async function initializeApp() {
+            // Kiểm tra xem có phải là provider không
+            const urlParams = new URLSearchParams(window.location.search);
+            isProvider = urlParams.has('provider');
+
+            if (isProvider) {
+                await setupProvider();
+            } else {
+                setupClient();
+            }
         }
 
-        // ========== PHẦN ĐIỆN THOẠI ==========
-        let phonePeer;
-        let localStream;
-
-        async function initPhone() {
+        // Thiết lập provider
+        async function setupProvider() {
             try {
-                // Khởi tạo camera
+                // Lấy quyền truy cập camera
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 document.getElementById('localVideo').srcObject = localStream;
 
                 // Tạo peer connection
-                phonePeer = new Peer({
+                peer = new Peer({
                     host: '0.peerjs.com',
                     port: 443,
                     path: '/'
                 });
 
-                // Hiển thị ID khi ready
-                phonePeer.on('open', id => {
-                    document.getElementById('peerId').textContent = id;
-                    new QRCode(document.getElementById('qrBox'), {
+                // Hiển thị ID provider
+                peer.on('open', (id) => {
+                    document.getElementById('providerIdDisplay').innerHTML = `
+                        <p>ID của bạn: <strong>${id}</strong></p>
+                        <button onclick="copyId('${id}')">Sao chép ID</button>
+                    `;
+                    new QRCode(document.getElementById('qrCodeContainer'), {
                         text: id,
                         width: 150,
                         height: 150
                     });
                 });
 
-                // Xử lý kết nối đến
-                phonePeer.on('call', call => {
-                    call.answer(localStream); // Gửi stream cho máy tính
+                // Xử lý kết nối từ client
+                peer.on('call', (call) => {
+                    call.answer(localStream);
                 });
 
             } catch (error) {
-                alert('Lỗi truy cập camera: ' + error.message);
+                alert('Lỗi khi truy cập camera: ' + error.message);
             }
         }
 
-        function copyID() {
-            const id = document.getElementById('peerId').textContent;
-            navigator.clipboard.writeText(id);
-            alert('Đã sao chép ID!');
+        // Thiết lập client
+        function setupClient() {
+            document.getElementById('clientSection').style.display = 'block';
         }
 
-        // ========== PHẦN MÁY TÍNH ==========
-        let computerPeer;
+        // Kết nối đến provider
+        function connectToProvider() {
+            const providerId = document.getElementById('providerIdInput').value;
+            if (!providerId) return alert('Vui lòng nhập ID Provider');
 
-        function connect() {
-            const phoneID = document.getElementById('inputID').value;
-            if(!phoneID) return alert('Vui lòng nhập ID điện thoại');
-
-            computerPeer = new Peer({
+            peer = new Peer({
                 host: '0.peerjs.com',
                 port: 443,
                 path: '/'
             });
 
-            computerPeer.on('open', () => {
-                const call = computerPeer.call(phoneID, null); // Gọi đến điện thoại
+            peer.on('open', () => {
+                const call = peer.call(providerId);
                 
-                call.on('stream', remoteStream => {
+                call.on('stream', (stream) => {
+                    remoteStream = stream;
                     const remoteVideo = document.getElementById('remoteVideo');
-                    remoteVideo.srcObject = remoteStream;
+                    remoteVideo.srcObject = stream;
                     remoteVideo.play();
                 });
             });
 
-            computerPeer.on('error', err => {
-                alert('Lỗi kết nối: ' + err.message);
+            peer.on('error', (error) => {
+                alert('Lỗi kết nối: ' + error.message);
             });
         }
+
+        // Chụp ảnh từ video stream
+        function capturePhoto() {
+            const video = document.getElementById('remoteVideo');
+            const canvas = document.getElementById('photoCanvas');
+            const context = canvas.getContext('2d');
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Có thể thêm logic lưu ảnh hoặc upload ở đây
+            const imageData = canvas.toDataURL('image/jpeg');
+            console.log('Ảnh đã chụp:', imageData);
+        }
+
+        // Sao chép ID
+        function copyId(id) {
+            navigator.clipboard.writeText(id);
+            alert('Đã sao chép ID vào clipboard!');
+        }
+
+        // Khởi động ứng dụng
+        initializeApp();
     </script>
 </body>
 </html>
