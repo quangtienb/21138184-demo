@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Shared Camera System</title>
+    <title>Remote Camera System</title>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
@@ -12,15 +12,15 @@
             padding: 20px;
             text-align: center;
         }
-        .mode-section {
-            margin: 20px 0;
+        .section {
+            background: #f8f9fa;
             padding: 20px;
             border-radius: 10px;
-            background: #f5f5f5;
+            margin: 20px 0;
         }
         video {
             width: 100%;
-            max-width: 500px;
+            max-width: 600px;
             border-radius: 10px;
             background: #000;
             margin: 10px 0;
@@ -28,11 +28,17 @@
         button {
             padding: 10px 20px;
             margin: 5px;
-            background: #2196F3;
+            background: #007bff;
             color: white;
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            transition: opacity 0.3s;
+        }
+        button:disabled {
+            background: #6c757d;
+            opacity: 0.7;
+            cursor: not-allowed;
         }
         #qrcode {
             margin: 15px auto;
@@ -40,172 +46,208 @@
             background: white;
             display: inline-block;
         }
-        canvas {
-            border: 1px solid #ddd;
+        .status {
+            color: #28a745;
+            font-weight: bold;
+            margin: 10px;
+        }
+        .error {
+            color: #dc3545;
             margin: 10px;
         }
     </style>
 </head>
 <body>
-    <h1>Hệ Thống Camera Chia Sẻ</h1>
-
-    <!-- Mode Selection -->
-    <div class="mode-section">
-        <button onclick="setMode('provider')">Trở thành Camera Provider</button>
-        <button onclick="setMode('controller')">Trở thành Camera Controller</button>
-    </div>
+    <h1>Hệ Thống Điều Khiển Camera Từ Xa</h1>
 
     <!-- Provider Section -->
-    <div id="providerSection" class="mode-section" style="display: none;">
-        <h2>📷 Bạn đang là Camera Provider</h2>
+    <div class="section" id="providerSection">
+        <h2>📷 Thiết Bị Cung Cấp Camera</h2>
+        <div id="providerStatus" class="status"></div>
         <video id="localVideo" autoplay playsinline muted></video>
         <div id="connectionInfo">
-            <p>ID chia sẻ: <strong id="peerId"></strong></p>
+            <p>ID của bạn: <strong id="peerId">Đang tạo...</strong></p>
             <div id="qrcode"></div>
-            <button onclick="copyPeerId()">Sao chép ID</button>
-            <button onclick="stopBeingProvider()">Dừng làm Provider</button>
+            <button onclick="copyId()">Sao chép ID</button>
+            <button onclick="stopSharing()" id="stopBtn" disabled>Dừng chia sẻ</button>
         </div>
     </div>
 
     <!-- Controller Section -->
-    <div id="controllerSection" class="mode-section" style="display: none;">
-        <h2>🎮 Bạn đang là Controller</h2>
-        <input type="text" id="providerId" placeholder="Nhập ID Provider">
-        <button onclick="connectToProvider()">Kết nối</button>
-        <button onclick="disconnect()">Ngắt kết nối</button>
+    <div class="section" id="controllerSection">
+        <h2>🎮 Thiết Bị Điều Khiển</h2>
+        <div id="controllerStatus" class="status"></div>
+        <input type="text" id="inputId" placeholder="Nhập ID Provider">
+        <button onclick="connect()" id="connectBtn">Kết nối</button>
+        <button onclick="disconnect()" id="disconnectBtn" disabled>Ngắt kết nối</button>
         <video id="remoteVideo" autoplay playsinline></video>
         <div>
-            <button onclick="capturePhoto()">Chụp Ảnh</button>
-            <canvas id="photoCanvas"></canvas>
+            <button onclick="capture()" id="captureBtn" disabled>Chụp ảnh</button>
+            <canvas id="canvas"></canvas>
         </div>
+        <div id="errorMessage" class="error"></div>
     </div>
 
     <script>
-        let peer;
-        let localStream;
-        let currentMode = null;
+        let peer = null;
+        let localStream = null;
+        let currentCall = null;
 
-        // Thiết lập chế độ hoạt động
-        function setMode(mode) {
-            currentMode = mode;
-            
-            // Ẩn tất cả các section
-            document.getElementById('providerSection').style.display = 'none';
-            document.getElementById('controllerSection').style.display = 'none';
-            
-            // Dừng các kết nối trước đó
-            if(peer) peer.destroy();
-            if(localStream) {
-                localStream.getTracks().forEach(track => track.stop());
-                localStream = null;
-            }
-
-            // Hiển thị section tương ứng
-            if(mode === 'provider') {
-                document.getElementById('providerSection').style.display = 'block';
-                initializeProvider();
-            } else if(mode === 'controller') {
-                document.getElementById('controllerSection').style.display = 'block';
-            }
-        }
-
-        // Khởi tạo Provider
-        async function initializeProvider() {
+        // ================= PROVIDER FUNCTIONS =================
+        async function startSharing() {
             try {
+                showStatus('provider', 'Đang khởi tạo...');
+                
+                // Kiểm tra quyền truy cập camera
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('Trình duyệt không hỗ trợ camera');
+                }
+
                 // Lấy stream camera
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                localStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: 1280, height: 720 } 
+                });
                 document.getElementById('localVideo').srcObject = localStream;
 
-                // Tạo peer connection
+                // Khởi tạo Peer
                 peer = new Peer({
                     host: '0.peerjs.com',
                     port: 443,
-                    path: '/'
+                    path: '/',
+                    config: {
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            // Thêm TURN server nếu cần
+                        ]
+                    }
                 });
 
-                // Hiển thị thông tin kết nối
-                peer.on('open', (id) => {
+                peer.on('open', id => {
+                    showStatus('provider', 'Đã sẵn sàng');
                     document.getElementById('peerId').textContent = id;
-                    new QRCode(document.getElementById('qrcode'), {
-                        text: id,
-                        width: 150,
-                        height: 150
-                    });
+                    new QRCode(document.getElementById('qrcode'), { text: id, width: 150, height: 150 });
+                    document.getElementById('stopBtn').disabled = false;
                 });
 
-                // Xử lý kết nối đến
-                peer.on('call', (call) => {
+                peer.on('call', call => {
                     call.answer(localStream);
+                    setupCallHandlers(call);
                 });
+
+                peer.on('error', handleError);
 
             } catch (error) {
-                alert('Lỗi truy cập camera: ' + error.message);
-                setMode(null);
+                handleError(error);
+                stopSharing();
             }
         }
 
-        // Kết nối đến Provider
-        function connectToProvider() {
-            const providerId = document.getElementById('providerId').value.trim();
-            if(!providerId) return alert('Vui lòng nhập ID Provider');
+        // ================= CONTROLLER FUNCTIONS =================
+        async function connect() {
+            const providerId = document.getElementById('inputId').value.trim();
+            if (!providerId) {
+                showError('Vui lòng nhập ID Provider');
+                return;
+            }
 
-            peer = new Peer({
-                host: '0.peerjs.com',
-                port: 443,
-                path: '/'
-            });
+            try {
+                showStatus('controller', 'Đang kết nối...');
+                document.getElementById('connectBtn').disabled = true;
 
-            peer.on('open', () => {
-                const call = peer.call(providerId);
-                
-                call.on('stream', (stream) => {
-                    const remoteVideo = document.getElementById('remoteVideo');
-                    remoteVideo.srcObject = stream;
-                    remoteVideo.play();
+                // Khởi tạo Peer
+                peer = new Peer({
+                    config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+                });
+
+                peer.on('open', () => {
+                    currentCall = peer.call(providerId);
+                    setupCallHandlers(currentCall);
+                });
+
+                peer.on('error', handleError);
+
+            } catch (error) {
+                handleError(error);
+            }
+        }
+
+        // ================= COMMON FUNCTIONS =================
+        function setupCallHandlers(call) {
+            call.on('stream', stream => {
+                const video = document.getElementById('remoteVideo');
+                video.srcObject = stream;
+                video.play().then(() => {
+                    showStatus('controller', 'Đã kết nối');
+                    document.getElementById('captureBtn').disabled = false;
+                    document.getElementById('disconnectBtn').disabled = false;
                 });
             });
 
-            peer.on('error', (error) => {
-                alert('Lỗi kết nối: ' + error.message);
+            call.on('close', () => {
+                showStatus('controller', 'Đã ngắt kết nối');
+                document.getElementById('remoteVideo').srcObject = null;
+                document.getElementById('captureBtn').disabled = true;
             });
         }
 
-        // Chụp ảnh từ video stream
-        function capturePhoto() {
+        function capture() {
             const video = document.getElementById('remoteVideo');
-            const canvas = document.getElementById('photoCanvas');
+            const canvas = document.getElementById('canvas');
             const ctx = canvas.getContext('2d');
             
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             
-            // Có thể thêm logic lưu ảnh tại đây
-            const imageData = canvas.toDataURL('image/jpeg');
-            console.log('Ảnh đã chụp:', imageData);
+            // Lưu ảnh
+            const link = document.createElement('a');
+            link.download = 'capture.jpg';
+            link.href = canvas.toDataURL('image/jpeg');
+            link.click();
         }
 
-        // Sao chép ID
-        function copyPeerId() {
-            const peerId = document.getElementById('peerId').textContent;
-            navigator.clipboard.writeText(peerId);
-            alert('Đã sao chép ID vào clipboard!');
+        function showStatus(section, message) {
+            document.getElementById(`${section}Status`).textContent = message;
         }
 
-        // Dừng làm Provider
-        function stopBeingProvider() {
-            setMode(null);
+        function handleError(error) {
+            console.error(error);
+            showError(error.message);
+            disconnect();
         }
 
-        // Ngắt kết nối
-        function disconnect() {
-            if(peer) peer.destroy();
-            const remoteVideo = document.getElementById('remoteVideo');
-            if(remoteVideo.srcObject) {
-                remoteVideo.srcObject.getTracks().forEach(track => track.stop());
-                remoteVideo.srcObject = null;
+        function showError(message) {
+            document.getElementById('errorMessage').textContent = message;
+            setTimeout(() => document.getElementById('errorMessage').textContent = '', 5000);
+        }
+
+        function stopSharing() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
             }
+            if (peer) peer.destroy();
+            document.getElementById('stopBtn').disabled = true;
+            showStatus('provider', 'Đã dừng chia sẻ');
         }
+
+        function disconnect() {
+            if (currentCall) currentCall.close();
+            if (peer) peer.destroy();
+            document.getElementById('connectBtn').disabled = false;
+            document.getElementById('disconnectBtn').disabled = true;
+            document.getElementById('captureBtn').disabled = true;
+            showStatus('controller', 'Chưa kết nối');
+        }
+
+        function copyId() {
+            const id = document.getElementById('peerId').textContent;
+            navigator.clipboard.writeText(id);
+            alert('Đã sao chép ID!');
+        }
+
+        // Khởi động hệ thống
+        startSharing();
     </script>
 </body>
 </html>
