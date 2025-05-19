@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Remote Camera Control</title>
+    <title>Shared Camera System</title>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
@@ -12,23 +12,33 @@
             padding: 20px;
             text-align: center;
         }
-        .container {
-            display: none;
+        .mode-section {
             margin: 20px 0;
+            padding: 20px;
+            border-radius: 10px;
+            background: #f5f5f5;
         }
         video {
             width: 100%;
             max-width: 500px;
             border-radius: 10px;
             background: #000;
+            margin: 10px 0;
         }
-        #providerSection {
-            background: #f5f5f5;
-            padding: 20px;
-            border-radius: 10px;
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
         }
-        #captureSection {
-            margin-top: 20px;
+        #qrcode {
+            margin: 15px auto;
+            padding: 10px;
+            background: white;
+            display: inline-block;
         }
         canvas {
             border: 1px solid #ddd;
@@ -37,21 +47,34 @@
     </style>
 </head>
 <body>
-    <!-- Provider Section -->
-    <div id="providerSection">
-        <h2>Thiết bị Camera (Provider)</h2>
-        <div id="providerIdDisplay"></div>
-        <div id="qrCodeContainer"></div>
-        <video id="localVideo" autoplay playsinline muted></video>
+    <h1>Hệ Thống Camera Chia Sẻ</h1>
+
+    <!-- Mode Selection -->
+    <div class="mode-section">
+        <button onclick="setMode('provider')">Trở thành Camera Provider</button>
+        <button onclick="setMode('controller')">Trở thành Camera Controller</button>
     </div>
 
-    <!-- Client Section -->
-    <div id="clientSection" class="container">
-        <h2>Thiết bị Điều khiển (Client)</h2>
-        <input type="text" id="providerIdInput" placeholder="Nhập ID Provider">
+    <!-- Provider Section -->
+    <div id="providerSection" class="mode-section" style="display: none;">
+        <h2>📷 Bạn đang là Camera Provider</h2>
+        <video id="localVideo" autoplay playsinline muted></video>
+        <div id="connectionInfo">
+            <p>ID chia sẻ: <strong id="peerId"></strong></p>
+            <div id="qrcode"></div>
+            <button onclick="copyPeerId()">Sao chép ID</button>
+            <button onclick="stopBeingProvider()">Dừng làm Provider</button>
+        </div>
+    </div>
+
+    <!-- Controller Section -->
+    <div id="controllerSection" class="mode-section" style="display: none;">
+        <h2>🎮 Bạn đang là Controller</h2>
+        <input type="text" id="providerId" placeholder="Nhập ID Provider">
         <button onclick="connectToProvider()">Kết nối</button>
+        <button onclick="disconnect()">Ngắt kết nối</button>
         <video id="remoteVideo" autoplay playsinline></video>
-        <div id="captureSection">
+        <div>
             <button onclick="capturePhoto()">Chụp Ảnh</button>
             <canvas id="photoCanvas"></canvas>
         </div>
@@ -60,26 +83,36 @@
     <script>
         let peer;
         let localStream;
-        let remoteStream;
-        let isProvider = false;
+        let currentMode = null;
 
-        // Khởi tạo ứng dụng
-        async function initializeApp() {
-            // Kiểm tra xem có phải là provider không
-            const urlParams = new URLSearchParams(window.location.search);
-            isProvider = urlParams.has('provider');
+        // Thiết lập chế độ hoạt động
+        function setMode(mode) {
+            currentMode = mode;
+            
+            // Ẩn tất cả các section
+            document.getElementById('providerSection').style.display = 'none';
+            document.getElementById('controllerSection').style.display = 'none';
+            
+            // Dừng các kết nối trước đó
+            if(peer) peer.destroy();
+            if(localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
 
-            if (isProvider) {
-                await setupProvider();
-            } else {
-                setupClient();
+            // Hiển thị section tương ứng
+            if(mode === 'provider') {
+                document.getElementById('providerSection').style.display = 'block';
+                initializeProvider();
+            } else if(mode === 'controller') {
+                document.getElementById('controllerSection').style.display = 'block';
             }
         }
 
-        // Thiết lập provider
-        async function setupProvider() {
+        // Khởi tạo Provider
+        async function initializeProvider() {
             try {
-                // Lấy quyền truy cập camera
+                // Lấy stream camera
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 document.getElementById('localVideo').srcObject = localStream;
 
@@ -90,38 +123,31 @@
                     path: '/'
                 });
 
-                // Hiển thị ID provider
+                // Hiển thị thông tin kết nối
                 peer.on('open', (id) => {
-                    document.getElementById('providerIdDisplay').innerHTML = `
-                        <p>ID của bạn: <strong>${id}</strong></p>
-                        <button onclick="copyId('${id}')">Sao chép ID</button>
-                    `;
-                    new QRCode(document.getElementById('qrCodeContainer'), {
+                    document.getElementById('peerId').textContent = id;
+                    new QRCode(document.getElementById('qrcode'), {
                         text: id,
                         width: 150,
                         height: 150
                     });
                 });
 
-                // Xử lý kết nối từ client
+                // Xử lý kết nối đến
                 peer.on('call', (call) => {
                     call.answer(localStream);
                 });
 
             } catch (error) {
-                alert('Lỗi khi truy cập camera: ' + error.message);
+                alert('Lỗi truy cập camera: ' + error.message);
+                setMode(null);
             }
         }
 
-        // Thiết lập client
-        function setupClient() {
-            document.getElementById('clientSection').style.display = 'block';
-        }
-
-        // Kết nối đến provider
+        // Kết nối đến Provider
         function connectToProvider() {
-            const providerId = document.getElementById('providerIdInput').value;
-            if (!providerId) return alert('Vui lòng nhập ID Provider');
+            const providerId = document.getElementById('providerId').value.trim();
+            if(!providerId) return alert('Vui lòng nhập ID Provider');
 
             peer = new Peer({
                 host: '0.peerjs.com',
@@ -133,7 +159,6 @@
                 const call = peer.call(providerId);
                 
                 call.on('stream', (stream) => {
-                    remoteStream = stream;
                     const remoteVideo = document.getElementById('remoteVideo');
                     remoteVideo.srcObject = stream;
                     remoteVideo.play();
@@ -149,25 +174,38 @@
         function capturePhoto() {
             const video = document.getElementById('remoteVideo');
             const canvas = document.getElementById('photoCanvas');
-            const context = canvas.getContext('2d');
-
+            const ctx = canvas.getContext('2d');
+            
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            // Có thể thêm logic lưu ảnh hoặc upload ở đây
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Có thể thêm logic lưu ảnh tại đây
             const imageData = canvas.toDataURL('image/jpeg');
             console.log('Ảnh đã chụp:', imageData);
         }
 
         // Sao chép ID
-        function copyId(id) {
-            navigator.clipboard.writeText(id);
+        function copyPeerId() {
+            const peerId = document.getElementById('peerId').textContent;
+            navigator.clipboard.writeText(peerId);
             alert('Đã sao chép ID vào clipboard!');
         }
 
-        // Khởi động ứng dụng
-        initializeApp();
+        // Dừng làm Provider
+        function stopBeingProvider() {
+            setMode(null);
+        }
+
+        // Ngắt kết nối
+        function disconnect() {
+            if(peer) peer.destroy();
+            const remoteVideo = document.getElementById('remoteVideo');
+            if(remoteVideo.srcObject) {
+                remoteVideo.srcObject.getTracks().forEach(track => track.stop());
+                remoteVideo.srcObject = null;
+            }
+        }
     </script>
 </body>
 </html>
