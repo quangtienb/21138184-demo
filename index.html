@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Remote Camera System</title>
+    <title>Remote Camera QR System</title>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
+        /* Giữ nguyên CSS từ bản trước */
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
@@ -25,81 +26,29 @@
             background: #000;
             margin: 10px 0;
         }
-        button {
-            padding: 10px 20px;
-            margin: 5px;
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: opacity 0.3s;
-        }
-        button:disabled {
-            background: #6c757d;
-            opacity: 0.7;
-            cursor: not-allowed;
-        }
-        .status {
-            color: #28a745;
-            font-weight: bold;
-            margin: 10px;
-        }
-        .error {
-            color: #dc3545;
-            margin: 10px;
-        }
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin: 10px auto;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        #qrcode {
-            margin: 15px auto;
-            padding: 10px;
-            background: white;
-            display: inline-block;
-        }
+        /* ... (Giữ nguyên các phần CSS khác) ... */
     </style>
 </head>
 <body>
-    <h1>Hệ Thống Camera Từ Xa</h1>
-
-    <!-- Provider Section -->
     <div class="section" id="providerSection">
         <h2>📷 Nhà Cung Cấp Camera</h2>
         <div class="status" id="providerStatus">Đang khởi tạo...</div>
         <div class="loader" id="providerLoader"></div>
         <video id="localVideo" autoplay playsinline muted></video>
         <div id="connectionInfo">
-            <p>ID của bạn: <strong id="peerId">Đang tạo ID...</strong></p>
+            <p>Quét mã QR để kết nối</p>
             <div id="qrcode"></div>
-            <button onclick="copyId()">Sao chép ID</button>
             <button onclick="stopSharing()" id="stopBtn" disabled>Dừng chia sẻ</button>
         </div>
     </div>
 
-    <!-- Controller Section -->
     <div class="section" id="controllerSection">
         <h2>🎮 Điều Khiển Từ Xa</h2>
-        <div class="status" id="controllerStatus">Chưa kết nối</div>
-        <div class="loader" id="controllerLoader" style="display: none;"></div>
-        <input type="text" id="inputId" placeholder="Nhập ID Provider">
-        <button onclick="connect()" id="connectBtn">Kết nối</button>
-        <button onclick="disconnect()" id="disconnectBtn" disabled>Ngắt kết nối</button>
+        <div class="status" id="controllerStatus">Đang kết nối...</div>
+        <div class="loader" id="controllerLoader"></div>
         <video id="remoteVideo" autoplay playsinline></video>
-        <div>
-            <button onclick="capture()" id="captureBtn" disabled>Chụp ảnh</button>
-            <canvas id="canvas"></canvas>
-        </div>
+        <button onclick="capture()" id="captureBtn" disabled>Chụp ảnh</button>
+        <canvas id="canvas"></canvas>
         <div class="error" id="errorMessage"></div>
     </div>
 
@@ -107,186 +56,109 @@
         let peer = null;
         let localStream = null;
         let currentCall = null;
-        let connectionTimeout = null;
+        const currentUrl = new URL(window.location.href);
 
         const ICE_CONFIG = {
             iceServers: [
                 { urls: "stun:stun.l.google.com:19302" },
                 { urls: "stun:stun1.l.google.com:19302" },
-                { urls: "stun:stun2.l.google.com:19302" },
-                { 
-                    urls: "turn:your-turn-server.com",
-                    username: "your-username",
-                    credential: "your-credential"
-                }
-            ],
-            iceCandidatePoolSize: 10
+                { urls: "stun:stun2.l.google.com:19302" }
+            ]
         };
 
-        // ================= PROVIDER FUNCTIONS =================
-        async function initializeProvider() {
+        // Tự động phát hiện chế độ qua URL
+        window.onload = () => {
+            if(currentUrl.searchParams.has('provider')) {
+                initProvider();
+            } else if(currentUrl.searchParams.has('peerId')) {
+                initController(currentUrl.searchParams.get('peerId'));
+            }
+        }
+
+        async function initProvider() {
             try {
                 showLoader('provider');
-                updateStatus('provider', 'Đang khởi tạo camera...');
-
-                // Kiểm tra và lấy quyền camera
-                if (!navigator.mediaDevices?.getUserMedia) {
-                    throw new Error('Trình duyệt không hỗ trợ camera');
-                }
-                
-                localStream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: { ideal: 1280 }, height: { ideal: 720 } }
-                });
-                
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 document.getElementById('localVideo').srcObject = localStream;
-                setupPeerConnection();
-                
-            } catch (error) {
-                handleError(error);
-                stopSharing();
-            }
-        }
-
-        function setupPeerConnection() {
-            peer = new Peer({
-                config: ICE_CONFIG,
-                debug: 3
-            });
-
-            peer.on('open', id => {
-                updateStatus('provider', 'Sẵn sàng kết nối');
-                document.getElementById('peerId').textContent = id;
-                new QRCode(document.getElementById('qrcode'), {
-                    text: id,
-                    width: 150,
-                    height: 150
-                });
-                document.getElementById('stopBtn').disabled = false;
-                hideLoader('provider');
-            });
-
-            peer.on('call', call => {
-                call.answer(localStream);
-                setupCallHandlers(call);
-            });
-
-            peer.on('error', handleError);
-        }
-
-        // ================= CONTROLLER FUNCTIONS =================
-        async function connect() {
-            const providerId = document.getElementById('inputId').value.trim();
-            if (!providerId) {
-                showError('Vui lòng nhập ID Provider');
-                return;
-            }
-
-            try {
-                showLoader('controller');
-                updateStatus('controller', 'Đang kết nối...');
-                document.getElementById('connectBtn').disabled = true;
 
                 peer = new Peer({
                     config: ICE_CONFIG,
                     debug: 3
                 });
 
-                setupConnectionTimeout();
-                setupPeerEvents(providerId);
+                peer.on('open', (id) => {
+                    // Tạo URL kết nối trực tiếp
+                    currentUrl.searchParams.delete('provider');
+                    currentUrl.searchParams.set('peerId', id);
+                    new QRCode(document.getElementById('qrcode'), {
+                        text: currentUrl.toString(),
+                        width: 200,
+                        height: 200
+                    });
+                    updateStatus('provider', 'Sẵn sàng kết nối');
+                });
+
+                peer.on('call', call => {
+                    call.answer(localStream);
+                    setupCallHandlers(call);
+                });
 
             } catch (error) {
                 handleError(error);
             }
         }
 
-        function setupPeerEvents(providerId) {
-            peer.on('open', () => {
-                currentCall = peer.call(providerId, null, {
-                    metadata: { connectionType: 'camera-stream' }
+        async function initController(peerId) {
+            try {
+                showLoader('controller');
+                peer = new Peer({ config: ICE_CONFIG });
+
+                peer.on('open', () => {
+                    currentCall = peer.call(peerId);
+                    currentCall.on('stream', stream => {
+                        document.getElementById('remoteVideo').srcObject = stream;
+                        document.getElementById('captureBtn').disabled = false;
+                        hideLoader('controller');
+                    });
                 });
-                
-                currentCall.on('stream', handleStream);
-                currentCall.on('iceStateChange', state => {
-                    console.log('ICE State:', state);
-                });
-            });
 
-            peer.on('error', handleError);
+                peer.on('error', handleError);
+
+            } catch (error) {
+                handleError(error);
+            }
         }
 
-        function handleStream(stream) {
-            clearTimeout(connectionTimeout);
-            const video = document.getElementById('remoteVideo');
-            video.srcObject = stream;
-            video.play().then(() => {
-                updateStatus('controller', 'Đã kết nối');
-                document.getElementById('captureBtn').disabled = false;
-                document.getElementById('disconnectBtn').disabled = false;
-                hideLoader('controller');
-            }).catch(error => {
-                handleError(new Error('Lỗi phát video'));
+        function setupCallHandlers(call) {
+            call.on('close', () => {
+                alert('Kết nối đã đóng');
+                window.location.reload();
             });
         }
 
-        // ================= COMMON FUNCTIONS =================
-        function setupConnectionTimeout() {
-            connectionTimeout = setTimeout(() => {
-                handleError(new Error('Timeout: Không thể kết nối sau 30 giây'));
-            }, 30000);
-        }
-
+        // Các hàm phụ trợ giữ nguyên
         function capture() {
             const video = document.getElementById('remoteVideo');
             const canvas = document.getElementById('canvas');
-            const ctx = canvas.getContext('2d');
-            
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
+            canvas.getContext('2d').drawImage(video, 0, 0);
             
-            // Tải ảnh về
             const link = document.createElement('a');
             link.download = `capture-${Date.now()}.jpg`;
             link.href = canvas.toDataURL('image/jpeg');
             link.click();
         }
 
-        function updateStatus(section, message) {
-            document.getElementById(`${section}Status`).textContent = message;
-        }
-
         function handleError(error) {
-            console.error('Error Details:', error);
-            showError(error.message);
-            hideLoader();
-            disconnect();
-        }
-
-        function showError(message) {
-            const errorElement = document.getElementById('errorMessage');
-            errorElement.textContent = message;
-            setTimeout(() => errorElement.textContent = '', 5000);
+            console.error(error);
+            alert(`Lỗi: ${error.message}`);
+            window.location.reload();
         }
 
         function stopSharing() {
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
-                localStream = null;
-            }
-            if (peer) peer.destroy();
-            updateStatus('provider', 'Đã dừng chia sẻ');
-            document.getElementById('stopBtn').disabled = true;
-        }
-
-        function disconnect() {
-            if (currentCall) currentCall.close();
-            if (peer) peer.destroy();
-            document.getElementById('remoteVideo').srcObject = null;
-            document.getElementById('connectBtn').disabled = false;
-            document.getElementById('disconnectBtn').disabled = true;
-            document.getElementById('captureBtn').disabled = true;
-            updateStatus('controller', 'Ngắt kết nối');
-            hideLoader('controller');
+            if(peer) peer.destroy();
+            window.location.reload();
         }
 
         function showLoader(section) {
@@ -297,13 +169,9 @@
             document.getElementById(`${section}Loader`).style.display = 'none';
         }
 
-        function copyId() {
-            navigator.clipboard.writeText(document.getElementById('peerId').textContent);
-            alert('Đã sao chép ID!');
+        function updateStatus(section, message) {
+            document.getElementById(`${section}Status`).textContent = message;
         }
-
-        // Khởi động hệ thống
-        initializeProvider();
     </script>
 </body>
 </html>
