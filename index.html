@@ -1,92 +1,224 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>ESP32-CAM Control</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32-CAM Viewer</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin: 20px;
-            background-color: #f0f0f0;
-        }
-        .container {
-            max-width: 800px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
             margin: 0 auto;
-            background-color: white;
             padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            background-color: #f5f5f5;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        .video-container {
+            background-color: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            position: relative;
         }
         #videoStream {
-            width: 640px;
-            height: 480px;
-            background-color: #000;
-            margin-bottom: 20px;
+            width: 100%;
+            display: block;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
         }
         button {
-            padding: 10px 20px;
-            margin: 5px;
-            font-size: 16px;
-            cursor: pointer;
-            background-color: #4CAF50;
+            padding: 12px 24px;
+            background-color: #4a89dc;
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
         }
         button:hover {
-            background-color: #45a049;
+            background-color: #3b7dd8;
+            transform: translateY(-2px);
         }
-        #flashBtn {
-            background-color: #f39c12;
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
         }
-        #flashBtn:hover {
-            background-color: #e67e22;
+        .capture-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         #capturedImage {
-            max-width: 640px;
-            margin-top: 20px;
-            display: none;
+            max-width: 100%;
+            border-radius: 8px;
+            margin-top: 15px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .connection-status {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .connected {
+            background-color: #2ecc71;
+        }
+        .disconnected {
+            background-color: #e74c3c;
+        }
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>ESP32-CAM Control Panel</h1>
-        <img id="videoStream" src="http://192.168.1.101/stream">
-        <div>
-            <button id="captureBtn">Chụp Ảnh</button>
-            <button id="flashBtn">Bật/Tắt Flash</button>
+    <div class="header">
+        <h1>ESP32-CAM Live Viewer</h1>
+        <div class="status">
+            <span id="statusIndicator" class="connection-status disconnected"></span>
+            <span id="statusText">Disconnected from camera</span>
         </div>
-        <img id="capturedImage" alt="Captured Image">
+    </div>
+
+    <div class="video-container">
+        <div id="loadingIndicator" class="loading">Connecting to camera...</div>
+        <img id="videoStream" src="" alt="Live Stream">
+    </div>
+
+    <div class="controls">
+        <button id="captureBtn">Capture Image</button>
+        <button id="refreshBtn">Refresh Stream</button>
+        <button id="fullscreenBtn">Fullscreen</button>
+    </div>
+
+    <div class="capture-area">
+        <h2>Captured Image</h2>
+        <img id="capturedImage" style="display: none;">
+        <a id="downloadLink" style="display: none; margin-top: 10px;" download="esp32-capture.jpg">Download Image</a>
     </div>
 
     <script>
-        const video = document.getElementById('videoStream');
+        // Configuration
+        const ESP32_IP = "192.168.1.100"; // Replace with your ESP32-CAM IP
+        const STREAM_URL = `http://${ESP32_IP}/stream`;
+        const CAPTURE_URL = `http://${ESP32_IP}/capture`;
+        
+        // DOM Elements
+        const videoStream = document.getElementById('videoStream');
         const captureBtn = document.getElementById('captureBtn');
-        const flashBtn = document.getElementById('flashBtn');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
         const capturedImage = document.getElementById('capturedImage');
+        const downloadLink = document.getElementById('downloadLink');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const loadingIndicator = document.getElementById('loadingIndicator');
 
-        // Chụp ảnh
-        captureBtn.addEventListener('click', () => {
-            capturedImage.src = 'http://192.168.1.101/capture?' + new Date().getTime();
+        // State variables
+        let isStreaming = false;
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT_ATTEMPTS = 5;
+
+        // Initialize stream
+        function startStream() {
+            videoStream.src = STREAM_URL;
+            loadingIndicator.style.display = 'block';
+            
+            videoStream.onload = function() {
+                loadingIndicator.style.display = 'none';
+                updateConnectionStatus(true);
+                isStreaming = true;
+                reconnectAttempts = 0;
+            };
+            
+            videoStream.onerror = function() {
+                handleStreamError();
+            };
+        }
+
+        // Handle stream errors
+        function handleStreamError() {
+            loadingIndicator.style.display = 'block';
+            updateConnectionStatus(false);
+            isStreaming = false;
+            
+            if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                reconnectAttempts++;
+                statusText.textContent = `Attempting to reconnect (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`;
+                setTimeout(startStream, 2000);
+            } else {
+                statusText.textContent = "Failed to connect to camera. Please check the connection.";
+                loadingIndicator.textContent = "Connection failed";
+            }
+        }
+
+        // Update connection status UI
+        function updateConnectionStatus(connected) {
+            if (connected) {
+                statusIndicator.className = "connection-status connected";
+                statusText.textContent = "Connected to camera";
+            } else {
+                statusIndicator.className = "connection-status disconnected";
+            }
+        }
+
+        // Capture image
+        captureBtn.addEventListener('click', function() {
+            if (!isStreaming) {
+                alert("Please wait for the stream to connect first");
+                return;
+            }
+            
+            // Show timestamped capture to avoid caching
+            capturedImage.src = CAPTURE_URL + '?t=' + new Date().getTime();
             capturedImage.style.display = 'block';
+            
+            // Set up download link
+            downloadLink.href = capturedImage.src;
+            downloadLink.style.display = 'inline-block';
         });
 
-        // Điều khiển flash
-        flashBtn.addEventListener('click', () => {
-            fetch('http://192.168.1.101/flash')
-                .then(response => response.text())
-                .then(state => {
-                    flashBtn.textContent = state === 'ON' ? 'Tắt Flash' : 'Bật Flash';
-                });
+        // Refresh stream
+        refreshBtn.addEventListener('click', function() {
+            startStream();
         });
 
-        // Tự động làm mới stream nếu bị mất kết nối
-        video.onerror = function() {
-            setTimeout(() => {
-                video.src = 'http://192.168.1.101/stream?' + new Date().getTime();
-            }, 1000);
-        };
+        // Fullscreen mode
+        fullscreenBtn.addEventListener('click', function() {
+            if (videoStream.requestFullscreen) {
+                videoStream.requestFullscreen();
+            } else if (videoStream.webkitRequestFullscreen) {
+                videoStream.webkitRequestFullscreen();
+            } else if (videoStream.msRequestFullscreen) {
+                videoStream.msRequestFullscreen();
+            }
+        });
+
+        // Start the stream when page loads
+        window.addEventListener('load', startStream);
     </script>
 </body>
 </html>
