@@ -7,7 +7,7 @@
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 1200px;
+            max-width: 800px;
             margin: 0 auto;
             padding: 20px;
             background-color: #f5f5f5;
@@ -18,12 +18,20 @@
             padding-bottom: 15px;
             border-bottom: 1px solid #ddd;
         }
+        .setup-panel {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
         .video-container {
             background-color: #000;
             border-radius: 8px;
             overflow: hidden;
             margin-bottom: 20px;
             position: relative;
+            display: none;
         }
         #videoStream {
             width: 100%;
@@ -33,11 +41,11 @@
             display: flex;
             justify-content: center;
             gap: 15px;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             flex-wrap: wrap;
         }
         button {
-            padding: 12px 24px;
+            padding: 10px 20px;
             background-color: #4a89dc;
             color: white;
             border: none;
@@ -48,22 +56,17 @@
         }
         button:hover {
             background-color: #3b7dd8;
-            transform: translateY(-2px);
         }
         button:disabled {
             background-color: #95a5a6;
             cursor: not-allowed;
         }
-        .capture-area {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        #capturedImage {
-            max-width: 100%;
-            border-radius: 8px;
-            margin-top: 15px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+            margin-right: 10px;
         }
         .status {
             text-align: center;
@@ -92,42 +95,67 @@
             color: white;
             font-size: 18px;
         }
+        .instructions {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #4a89dc;
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>ESP32-CAM Live Viewer</h1>
+        <h1>ESP32-CAM Viewer</h1>
+        <p>Enter your ESP32-CAM's IP address to view the stream</p>
+    </div>
+
+    <div class="instructions">
+        <h3>How to find the IP address:</h3>
+        <ol>
+            <li>Connect your ESP32-CAM to your computer</li>
+            <li>Open Serial Monitor in Arduino IDE</li>
+            <li>Look for a message like: "Camera Stream URL: http://192.168.x.x/stream"</li>
+            <li>Enter the IP address (192.168.x.x) below</li>
+        </ol>
+    </div>
+
+    <div class="setup-panel">
+        <h2>Camera Setup</h2>
+        <div>
+            <input type="text" id="ipInput" placeholder="192.168.1.100">
+            <button id="connectBtn">Connect</button>
+        </div>
         <div class="status">
             <span id="statusIndicator" class="connection-status disconnected"></span>
-            <span id="statusText">Disconnected from camera</span>
+            <span id="statusText">Not connected</span>
         </div>
     </div>
 
-    <div class="video-container">
+    <div class="video-container" id="videoContainer">
         <div id="loadingIndicator" class="loading">Connecting to camera...</div>
         <img id="videoStream" src="" alt="Live Stream">
     </div>
 
-    <div class="controls">
+    <div class="controls" id="controlPanel" style="display: none;">
         <button id="captureBtn">Capture Image</button>
         <button id="refreshBtn">Refresh Stream</button>
         <button id="fullscreenBtn">Fullscreen</button>
     </div>
 
-    <div class="capture-area">
+    <div id="captureArea" style="text-align: center; display: none;">
         <h2>Captured Image</h2>
-        <img id="capturedImage" style="display: none;">
+        <img id="capturedImage" style="max-width: 100%; border-radius: 8px; display: none;">
         <a id="downloadLink" style="display: none; margin-top: 10px;" download="esp32-capture.jpg">Download Image</a>
     </div>
 
     <script>
-        // Configuration
-        const ESP32_IP = "192.168.1.100"; // Replace with your ESP32-CAM IP
-        const STREAM_URL = `http://${ESP32_IP}/stream`;
-        const CAPTURE_URL = `http://${ESP32_IP}/capture`;
-        
         // DOM Elements
+        const ipInput = document.getElementById('ipInput');
+        const connectBtn = document.getElementById('connectBtn');
+        const videoContainer = document.getElementById('videoContainer');
         const videoStream = document.getElementById('videoStream');
+        const controlPanel = document.getElementById('controlPanel');
         const captureBtn = document.getElementById('captureBtn');
         const refreshBtn = document.getElementById('refreshBtn');
         const fullscreenBtn = document.getElementById('fullscreenBtn');
@@ -136,22 +164,58 @@
         const statusIndicator = document.getElementById('statusIndicator');
         const statusText = document.getElementById('statusText');
         const loadingIndicator = document.getElementById('loadingIndicator');
+        const captureArea = document.getElementById('captureArea');
 
         // State variables
+        let currentIP = '';
         let isStreaming = false;
         let reconnectAttempts = 0;
-        const MAX_RECONNECT_ATTEMPTS = 5;
+        const MAX_RECONNECT_ATTEMPTS = 3;
+
+        // Connect to camera
+        connectBtn.addEventListener('click', function() {
+            const ip = ipInput.value.trim();
+            if (!ip) {
+                alert('Please enter a valid IP address');
+                return;
+            }
+            
+            // Validate IP format (simple validation)
+            if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip)) {
+                alert('Please enter a valid IP address (e.g. 192.168.1.100)');
+                return;
+            }
+            
+            currentIP = ip;
+            startStream();
+        });
 
         // Initialize stream
         function startStream() {
-            videoStream.src = STREAM_URL;
+            const STREAM_URL = `http://${currentIP}/stream`;
+            
+            // Show loading and video container
             loadingIndicator.style.display = 'block';
+            videoContainer.style.display = 'block';
+            controlPanel.style.display = 'flex';
+            captureArea.style.display = 'block';
+            
+            // Update status
+            statusText.textContent = "Connecting...";
+            statusIndicator.className = "connection-status disconnected";
+            
+            // Set stream source
+            videoStream.src = STREAM_URL;
             
             videoStream.onload = function() {
+                // Connection successful
                 loadingIndicator.style.display = 'none';
                 updateConnectionStatus(true);
                 isStreaming = true;
                 reconnectAttempts = 0;
+                
+                // Save IP to localStorage for future use
+                localStorage.setItem('esp32cam_ip', currentIP);
             };
             
             videoStream.onerror = function() {
@@ -170,7 +234,14 @@
                 statusText.textContent = `Attempting to reconnect (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`;
                 setTimeout(startStream, 2000);
             } else {
-                statusText.textContent = "Failed to connect to camera. Please check the connection.";
+                statusText.textContent = "Failed to connect to camera. Please check:";
+                const errorList = [
+                    "1. The IP address is correct",
+                    "2. ESP32-CAM is powered on",
+                    "3. Both devices are on the same network",
+                    "4. No firewall is blocking the connection"
+                ].join("<br>");
+                statusText.innerHTML += `<div style="text-align: left; margin-top: 10px;">${errorList}</div>`;
                 loadingIndicator.textContent = "Connection failed";
             }
         }
@@ -179,7 +250,7 @@
         function updateConnectionStatus(connected) {
             if (connected) {
                 statusIndicator.className = "connection-status connected";
-                statusText.textContent = "Connected to camera";
+                statusText.textContent = `Connected to ${currentIP}`;
             } else {
                 statusIndicator.className = "connection-status disconnected";
             }
@@ -193,7 +264,7 @@
             }
             
             // Show timestamped capture to avoid caching
-            capturedImage.src = CAPTURE_URL + '?t=' + new Date().getTime();
+            capturedImage.src = `http://${currentIP}/capture?t=${new Date().getTime()}`;
             capturedImage.style.display = 'block';
             
             // Set up download link
@@ -203,6 +274,7 @@
 
         // Refresh stream
         refreshBtn.addEventListener('click', function() {
+            if (!currentIP) return;
             startStream();
         });
 
@@ -217,8 +289,13 @@
             }
         });
 
-        // Start the stream when page loads
-        window.addEventListener('load', startStream);
+        // Load saved IP from localStorage if available
+        window.addEventListener('load', function() {
+            const savedIP = localStorage.getItem('esp32cam_ip');
+            if (savedIP) {
+                ipInput.value = savedIP;
+            }
+        });
     </script>
 </body>
 </html>
