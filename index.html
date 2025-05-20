@@ -3,159 +3,198 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Điều khiển ESP32-CAM từ xa</title>
+    <title>Điều khiển ESP32-CAM</title>
     <style>
+        :root {
+            --primary: #3498db;
+            --danger: #e74c3c;
+            --success: #2ecc71;
+        }
         body {
-            font-family: 'Arial', sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
-            text-align: center;
-            background-color: #f5f5f5;
+            background-color: #f8f9fa;
         }
         h1 {
             color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
         }
-        #videoContainer {
+        #video-container {
             position: relative;
-            margin: 20px 0;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
         #stream {
             width: 100%;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            display: block;
         }
         .controls {
             display: flex;
             gap: 10px;
             justify-content: center;
             flex-wrap: wrap;
+            margin-bottom: 20px;
         }
         button {
-            background-color: #3498db;
-            color: white;
-            border: none;
             padding: 12px 24px;
+            border: none;
             border-radius: 4px;
-            cursor: pointer;
             font-size: 16px;
-            transition: background-color 0.3s;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 150px;
+        }
+        #capture-btn {
+            background-color: var(--primary);
+            color: white;
+        }
+        #flash-btn {
+            background-color: var(--danger);
+            color: white;
         }
         button:hover {
-            background-color: #2980b9;
-        }
-        #ipInput {
-            padding: 10px;
-            width: 200px;
-            margin-bottom: 20px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            opacity: 0.9;
+            transform: translateY(-2px);
         }
         .status {
-            margin-top: 20px;
-            padding: 10px;
+            padding: 15px;
             border-radius: 4px;
+            margin-top: 20px;
+            text-align: center;
+            display: none;
         }
         .success {
-            background-color: #d4edda;
-            color: #155724;
+            background-color: rgba(46, 204, 113, 0.2);
+            color: var(--success);
+            display: block;
         }
         .error {
-            background-color: #f8d7da;
-            color: #721c24;
+            background-color: rgba(231, 76, 60, 0.2);
+            color: var(--danger);
+            display: block;
+        }
+        .connection-info {
+            background-color: #f1f1f1;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        @media (max-width: 600px) {
+            button {
+                width: 100%;
+            }
         }
     </style>
 </head>
 <body>
-    <h1>Điều khiển ESP32-CAM từ xa</h1>
+    <h1>Điều Khiển ESP32-CAM Từ Xa</h1>
     
-    <div>
-        <input type="text" id="ipInput" placeholder="Nhập IP ESP32-CAM">
-        <button onclick="saveIP()">Lưu IP</button>
+    <div class="connection-info">
+        <p id="connection-status">Đang kết nối với <strong>esp32cam.local</strong>...</p>
     </div>
     
-    <div id="videoContainer">
+    <div id="video-container">
         <img id="stream" src="" alt="Video Stream">
     </div>
     
     <div class="controls">
-        <button onclick="captureImage()">📸 Chụp ảnh</button>
-        <button onclick="toggleFlash()">⚡ Đèn Flash</button>
+        <button id="capture-btn" onclick="captureImage()">📸 Chụp Ảnh</button>
+        <button id="flash-btn" onclick="toggleFlash()">⚡ Đèn Flash: OFF</button>
     </div>
     
     <div id="status" class="status"></div>
 
     <script>
-        // Lưu IP vào localStorage
-        function saveIP() {
-            const ip = document.getElementById('ipInput').value;
-            if(ip) {
-                localStorage.setItem('esp32_ip', ip);
-                showStatus(`Đã lưu IP: ${ip}`, 'success');
-                startStream();
-            }
+        const hostname = "esp32cam.local";
+        let flashState = false;
+        
+        // Tự động kết nối khi trang load
+        window.onload = function() {
+            initStream();
+            checkConnection();
+        };
+
+        // Khởi tạo video stream
+        function initStream() {
+            const streamUrl = `http://${hostname}/stream`;
+            document.getElementById('stream').src = streamUrl;
+            updateStatus(`Đã kết nối với ${hostname}`, 'success');
         }
 
-        // Load IP đã lưu
-        function loadIP() {
-            const savedIP = localStorage.getItem('esp32_ip');
-            if(savedIP) {
-                document.getElementById('ipInput').value = savedIP;
-                startStream();
-            }
-        }
-
-        // Hiển thị thông báo
-        function showStatus(message, type) {
-            const statusDiv = document.getElementById('status');
-            statusDiv.textContent = message;
-            statusDiv.className = `status ${type}`;
-            setTimeout(() => statusDiv.textContent = '', 3000);
-        }
-
-        // Bật/tắt đèn flash
-        function toggleFlash() {
-            const ip = localStorage.getItem('esp32_ip');
-            if(!ip) {
-                showStatus('Vui lòng nhập IP trước!', 'error');
-                return;
-            }
-            
-            fetch(`http://${ip}/flash`)
-                .then(response => response.text())
-                .then(text => showStatus(text, 'success'))
-                .catch(err => showStatus('Lỗi kết nối!', 'error'));
+        // Kiểm tra kết nối
+        function checkConnection() {
+            fetch(`http://${hostname}/capture`, { method: 'HEAD' })
+                .then(() => {
+                    document.getElementById('connection-status').innerHTML = 
+                        `Đã kết nối với <strong>${hostname}</strong>`;
+                })
+                .catch(() => {
+                    document.getElementById('connection-status').innerHTML = 
+                        `Không thể kết nối với ${hostname}.<br>Đảm bảo ESP32 và thiết bị của bạn cùng mạng WiFi`;
+                    updateStatus("Lỗi kết nối!", 'error');
+                });
         }
 
         // Chụp ảnh
         function captureImage() {
-            const ip = localStorage.getItem('esp32_ip');
-            if(!ip) {
-                showStatus('Vui lòng nhập IP trước!', 'error');
-                return;
-            }
+            const timestamp = new Date().getTime();
+            const captureUrl = `http://${hostname}/capture?t=${timestamp}`;
             
-            const link = document.createElement('a');
-            link.href = `http://${ip}/capture?${Date.now()}`; // Thêm timestamp để tránh cache
-            link.download = 'esp32-capture.jpg';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            showStatus('Đã chụp ảnh!', 'success');
+            fetch(captureUrl)
+                .then(response => {
+                    if (!response.ok) throw new Error('Lỗi chụp ảnh');
+                    return response.blob();
+                })
+                .then(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `esp32-capture-${timestamp}.jpg`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    updateStatus('Đã lưu ảnh thành công!', 'success');
+                })
+                .catch(err => {
+                    updateStatus(err.message, 'error');
+                });
         }
 
-        // Bật video stream
-        function startStream() {
-            const ip = localStorage.getItem('esp32_ip');
-            if(ip) {
-                document.getElementById('stream').src = `http://${ip}/stream`;
-                showStatus('Đã kết nối video stream!', 'success');
-            }
+        // Bật/tắt đèn flash
+        function toggleFlash() {
+            fetch(`http://${hostname}/flash`)
+                .then(response => response.text())
+                .then(state => {
+                    flashState = (state === 'ON');
+                    document.getElementById('flash-btn').innerHTML = 
+                        `⚡ Đèn Flash: ${flashState ? 'ON' : 'OFF'}`;
+                    updateStatus(`Đèn Flash: ${state}`, 'success');
+                })
+                .catch(err => {
+                    updateStatus('Lỗi điều khiển đèn flash', 'error');
+                });
         }
 
-        // Tự động load IP khi trang web mở
-        window.onload = loadIP;
+        // Hiển thị thông báo
+        function updateStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            setTimeout(() => {
+                statusDiv.style.opacity = '0';
+                setTimeout(() => {
+                    statusDiv.textContent = '';
+                    statusDiv.className = 'status';
+                    statusDiv.style.opacity = '1';
+                }, 500);
+            }, 3000);
+        }
     </script>
 </body>
 </html>
