@@ -1,35 +1,35 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32-CAM Control Panel</title>
+    <title>ESP32-CAM Remote Viewer</title>
     <style>
         body {
-            font-family: 'Arial', sans-serif;
-            background: #f5f5f5;
-            margin: 0;
-            padding: 20px;
-            color: #333;
-        }
-        .container {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             max-width: 800px;
             margin: 0 auto;
-            background: white;
             padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            background-color: #f5f5f5;
         }
-        h1 {
+        .header {
             text-align: center;
-            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        .connection-panel {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
         }
         .video-container {
-            position: relative;
-            margin-bottom: 20px;
-            border: 3px solid #ddd;
+            background-color: #000;
             border-radius: 8px;
             overflow: hidden;
+            margin-bottom: 20px;
+            position: relative;
+            display: none;
         }
         #videoStream {
             width: 100%;
@@ -44,131 +44,323 @@
         }
         button {
             padding: 10px 20px;
-            background: #3498db;
+            background-color: #4a89dc;
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: 4px;
             cursor: pointer;
             font-size: 16px;
             transition: all 0.3s;
         }
         button:hover {
-            background: #2980b9;
-            transform: translateY(-2px);
+            background-color: #3b7dd8;
         }
         button:disabled {
-            background: #95a5a6;
+            background-color: #95a5a6;
             cursor: not-allowed;
         }
-        #capturedImageContainer {
-            text-align: center;
-            margin-top: 20px;
-        }
-        #capturedImage {
-            max-width: 100%;
-            border: 2px solid #ddd;
-            border-radius: 5px;
+        input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+            margin-right: 10px;
         }
         .status {
             text-align: center;
-            margin: 10px 0;
-            font-style: italic;
-            color: #7f8c8d;
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 4px;
         }
-        .timestamp {
-            text-align: right;
-            font-size: 12px;
-            color: #95a5a6;
+        .connection-status {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .connected {
+            background-color: #2ecc71;
+        }
+        .disconnected {
+            background-color: #e74c3c;
+        }
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
+        }
+        .photo-gallery {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        .photo-item {
+            margin: 10px;
+            text-align: center;
+        }
+        .photo-item img {
+            max-width: 150px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .photo-actions {
+            margin-top: 5px;
+        }
+        .photo-actions button {
+            padding: 5px 10px;
+            font-size: 14px;
+            margin: 2px;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Điều Khiển ESP32-CAM</h1>
-        <div class="timestamp" id="currentTime"></div>
-        
-        <div class="video-container">
-            <img id="videoStream" src="http://192.168.1.6/stream" alt="Live Stream">
+    <div class="header">
+        <h1>ESP32-CAM Remote Viewer</h1>
+        <p>Connect to your ESP32-CAM by entering its IP address</p>
+    </div>
+
+    <div class="connection-panel">
+        <h2>Connection Settings</h2>
+        <div>
+            <input type="text" id="ipInput" placeholder="192.168.1.100">
+            <button id="connectBtn">Connect</button>
         </div>
-        
-        <div class="status" id="statusMessage">Kết nối thành công với ESP32-CAM</div>
-        
-        <div class="controls">
-            <button id="captureBtn">Chụp Ảnh</button>
-            <button id="downloadBtn" disabled>Tải Ảnh</button>
-            <button id="refreshBtn">Làm Mới</button>
-        </div>
-        
-        <div id="capturedImageContainer" style="display: none;">
-            <h3>Ảnh Đã Chụp</h3>
-            <img id="capturedImage" src="" alt="Captured Image">
+        <div class="status">
+            <span id="statusIndicator" class="connection-status disconnected"></span>
+            <span id="statusText">Not connected</span>
         </div>
     </div>
 
+    <div class="video-container" id="videoContainer">
+        <div id="loadingIndicator" class="loading">Connecting to camera...</div>
+        <img id="videoStream" src="" alt="Live Stream">
+    </div>
+
+    <div class="controls" id="controlPanel" style="display: none;">
+        <button id="captureBtn">Capture Photo</button>
+        <button id="flashBtn">Flash OFF</button>
+        <button id="refreshBtn">Refresh Stream</button>
+    </div>
+
+    <div id="photoGallery" class="photo-gallery">
+        <!-- Photos will be loaded here dynamically -->
+    </div>
+
     <script>
-        // Cập nhật thời gian thực
-        function updateTime() {
-            const now = new Date();
-            document.getElementById('currentTime').textContent = 
-                `Thời gian: ${now.toLocaleString()}`;
-        }
-        setInterval(updateTime, 1000);
-        updateTime();
+        // DOM Elements
+        const ipInput = document.getElementById('ipInput');
+        const connectBtn = document.getElementById('connectBtn');
+        const videoContainer = document.getElementById('videoContainer');
+        const videoStream = document.getElementById('videoStream');
+        const controlPanel = document.getElementById('controlPanel');
+        const captureBtn = document.getElementById('captureBtn');
+        const flashBtn = document.getElementById('flashBtn');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const photoGallery = document.getElementById('photoGallery');
 
-        // Biến lưu ảnh đã chụp
-        let capturedImageUrl = null;
+        // State variables
+        let esp32IP = '';
+        let isStreaming = false;
+        let flashState = false;
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT_ATTEMPTS = 3;
 
-        // Xử lý nút chụp ảnh
-        document.getElementById('captureBtn').addEventListener('click', function() {
-            const videoStream = document.getElementById('videoStream');
-            const canvas = document.createElement('canvas');
-            canvas.width = videoStream.videoWidth || videoStream.naturalWidth;
-            canvas.height = videoStream.videoHeight || videoStream.naturalHeight;
-            
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(videoStream, 0, 0, canvas.width, canvas.height);
-            
-            capturedImageUrl = canvas.toDataURL('image/jpeg');
-            document.getElementById('capturedImage').src = capturedImageUrl;
-            document.getElementById('capturedImageContainer').style.display = 'block';
-            document.getElementById('downloadBtn').disabled = false;
-            
-            document.getElementById('statusMessage').textContent = 
-                `Ảnh đã chụp lúc ${new Date().toLocaleTimeString()}`;
-        });
+        // Connect to ESP32-CAM
+        connectBtn.addEventListener('click', connectToESP32);
 
-        // Xử lý nút tải ảnh
-        document.getElementById('downloadBtn').addEventListener('click', function() {
-            if (capturedImageUrl) {
-                const link = document.createElement('a');
-                link.href = capturedImageUrl;
-                link.download = `esp32-cam_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                document.getElementById('statusMessage').textContent = 
-                    `Đã tải ảnh thành công!`;
+        function connectToESP32() {
+            const ip = ipInput.value.trim();
+            if (!ip) {
+                alert('Please enter a valid IP address');
+                return;
             }
-        });
-
-        // Xử lý nút làm mới
-        document.getElementById('refreshBtn').addEventListener('click', function() {
-            const videoStream = document.getElementById('videoStream');
-            videoStream.src = videoStream.src + '?' + new Date().getTime();
             
-            document.getElementById('statusMessage').textContent = 
-                `Đã làm mới stream thành công!`;
+            if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip)) {
+                alert('Please enter a valid IP address (e.g. 192.168.1.100)');
+                return;
+            }
+            
+            esp32IP = ip;
+            startStream();
+            loadPhotos();
+        }
+
+        // Initialize stream
+        function startStream() {
+            if (!esp32IP) return;
+            
+            const STREAM_URL = `http://${esp32IP}/stream`;
+            
+            loadingIndicator.style.display = 'block';
+            videoContainer.style.display = 'block';
+            controlPanel.style.display = 'flex';
+            
+            statusText.textContent = "Connecting...";
+            statusIndicator.className = "connection-status disconnected";
+            
+            videoStream.src = STREAM_URL;
+            
+            videoStream.onload = function() {
+                loadingIndicator.style.display = 'none';
+                updateConnectionStatus(true);
+                isStreaming = true;
+                reconnectAttempts = 0;
+                
+                // Save IP to localStorage for future use
+                localStorage.setItem('esp32cam_ip', esp32IP);
+            };
+            
+            videoStream.onerror = function() {
+                handleStreamError();
+            };
+        }
+
+        // Handle stream errors
+        function handleStreamError() {
+            loadingIndicator.style.display = 'block';
+            updateConnectionStatus(false);
+            isStreaming = false;
+            
+            if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                reconnectAttempts++;
+                statusText.textContent = `Attempting to reconnect (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`;
+                setTimeout(startStream, 2000);
+            } else {
+                statusText.textContent = "Failed to connect to camera. Please check:";
+                const errorList = [
+                    "1. The IP address is correct",
+                    "2. ESP32-CAM is powered on",
+                    "3. Both devices are on the same network",
+                    "4. No firewall is blocking the connection"
+                ].join("<br>");
+                statusText.innerHTML += `<div style="text-align: left; margin-top: 10px;">${errorList}</div>`;
+                loadingIndicator.textContent = "Connection failed";
+            }
+        }
+
+        // Update connection status UI
+        function updateConnectionStatus(connected) {
+            if (connected) {
+                statusIndicator.className = "connection-status connected";
+                statusText.textContent = `Connected to ${esp32IP}`;
+            } else {
+                statusIndicator.className = "connection-status disconnected";
+            }
+        }
+
+        // Capture photo
+        captureBtn.addEventListener('click', function() {
+            if (!isStreaming || !esp32IP) {
+                alert("Please connect to the camera first");
+                return;
+            }
+            
+            fetch(`http://${esp32IP}/capture`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        loadPhotos();
+                    } else {
+                        alert("Failed to capture photo");
+                    }
+                })
+                .catch(error => {
+                    console.error("Capture error:", error);
+                    alert("Error capturing photo");
+                });
         });
 
-        // Kiểm tra kết nối
+        // Toggle flash
+        flashBtn.addEventListener('click', function() {
+            if (!esp32IP) return;
+            
+            flashState = !flashState;
+            flashBtn.textContent = flashState ? "Flash ON" : "Flash OFF";
+            
+            fetch(`http://${esp32IP}/flash?on=${flashState ? 1 : 0}`)
+                .then(response => response.json())
+                .catch(error => console.error("Flash error:", error));
+        });
+
+        // Refresh stream
+        refreshBtn.addEventListener('click', function() {
+            if (!esp32IP) return;
+            startStream();
+        });
+
+        // Load captured photos
+        function loadPhotos() {
+            if (!esp32IP) return;
+            
+            fetch(`http://${esp32IP}/photos`)
+                .then(response => response.json())
+                .then(data => {
+                    photoGallery.innerHTML = '';
+                    
+                    data.photos.forEach(photo => {
+                        const photoDiv = document.createElement('div');
+                        photoDiv.className = 'photo-item';
+                        
+                        const img = document.createElement('img');
+                        img.src = `http://${esp32IP}/photo?id=${photo.id}&t=${Date.now()}`;
+                        img.alt = `Photo ${photo.id}`;
+                        
+                        const actionsDiv = document.createElement('div');
+                        actionsDiv.className = 'photo-actions';
+                        
+                        const downloadBtn = document.createElement('button');
+                        downloadBtn.textContent = 'Download';
+                        downloadBtn.onclick = () => {
+                            const a = document.createElement('a');
+                            a.href = img.src;
+                            a.download = `photo_${photo.id}.jpg`;
+                            a.click();
+                        };
+                        
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.textContent = 'Delete';
+                        deleteBtn.onclick = () => {
+                            if (confirm('Delete this photo?')) {
+                                fetch(`http://${esp32IP}/delete?id=${photo.id}`)
+                                    .then(response => response.json())
+                                    .then(result => {
+                                        if (result.success) {
+                                            loadPhotos();
+                                        } else {
+                                            alert('Failed to delete photo');
+                                        }
+                                    });
+                            }
+                        };
+                        
+                        actionsDiv.appendChild(downloadBtn);
+                        actionsDiv.appendChild(deleteBtn);
+                        
+                        photoDiv.appendChild(img);
+                        photoDiv.appendChild(actionsDiv);
+                        
+                        photoGallery.appendChild(photoDiv);
+                    });
+                })
+                .catch(error => {
+                    console.error("Error loading photos:", error);
+                });
+        }
+
+        // Load saved IP from localStorage if available
         window.addEventListener('load', function() {
-            const videoStream = document.getElementById('videoStream');
-            videoStream.onerror = function() {
-                document.getElementById('statusMessage').textContent = 
-                    'Lỗi kết nối với ESP32-CAM. Vui lòng kiểm tra lại!';
-                document.getElementById('statusMessage').style.color = 'red';
-            };
+            const savedIP = localStorage.getItem('esp32cam_ip');
+            if (savedIP) {
+                ipInput.value = savedIP;
+            }
         });
     </script>
 </body>
