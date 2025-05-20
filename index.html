@@ -1,116 +1,92 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32-CAM Control Panel</title>
+    <title>ESP32-CAM Control</title>
     <style>
         body {
-            font-family: 'Arial', sans-serif;
-            background: #f5f5f5;
-            margin: 0;
-            padding: 20px;
-            color: #333;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+            background-color: #f0f0f0;
         }
         .container {
             max-width: 800px;
             margin: 0 auto;
-            background: white;
+            background-color: white;
             padding: 20px;
             border-radius: 10px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
-        h1 {
-            text-align: center;
-            color: #2c3e50;
-        }
-        .video-container {
-            position: relative;
+        #videoStream {
+            width: 640px;
+            height: 480px;
+            background-color: #000;
             margin-bottom: 20px;
-            border: 3px solid #ddd;
-            border-radius: 8px;
-            overflow100/stream" alt="Live Stream">
-        </div>
-        
-        <div class="status" id="statusMessage">Kết nối thành công với ESP32-CAM</div>
-        
-        <div class="controls">
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #flashBtn {
+            background-color: #f39c12;
+        }
+        #flashBtn:hover {
+            background-color: #e67e22;
+        }
+        #capturedImage {
+            max-width: 640px;
+            margin-top: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ESP32-CAM Control Panel</h1>
+        <img id="videoStream" src="http://192.168.1.101/stream">
+        <div>
             <button id="captureBtn">Chụp Ảnh</button>
-            <button id="downloadBtn" disabled>Tải Ảnh</button>
-            <button id="refreshBtn">Làm Mới</button>
+            <button id="flashBtn">Bật/Tắt Flash</button>
         </div>
-        
-        <div id="capturedImageContainer" style="display: none;">
-            <h3>Ảnh Đã Chụp</h3>
-            <img id="capturedImage" src="" alt="Captured Image">
-        </div>
+        <img id="capturedImage" alt="Captured Image">
     </div>
 
     <script>
-        // Cập nhật thời gian thực
-        function updateTime() {
-            const now = new Date();
-            document.getElementById('currentTime').textContent = 
-                `Thời gian: ${now.toLocaleString()}`;
-        }
-        setInterval(updateTime, 1000);
-        updateTime();
+        const video = document.getElementById('videoStream');
+        const captureBtn = document.getElementById('captureBtn');
+        const flashBtn = document.getElementById('flashBtn');
+        const capturedImage = document.getElementById('capturedImage');
 
-        // Biến lưu ảnh đã chụp
-        let capturedImageUrl = null;
-
-        // Xử lý nút chụp ảnh
-        document.getElementById('captureBtn').addEventListener('click', function() {
-            const videoStream = document.getElementById('videoStream');
-            const canvas = document.createElement('canvas');
-            canvas.width = videoStream.videoWidth || videoStream.naturalWidth;
-            canvas.height = videoStream.videoHeight || videoStream.naturalHeight;
-            
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(videoStream, 0, 0, canvas.width, canvas.height);
-            
-            capturedImageUrl = canvas.toDataURL('image/jpeg');
-            document.getElementById('capturedImage').src = capturedImageUrl;
-            document.getElementById('capturedImageContainer').style.display = 'block';
-            document.getElementById('downloadBtn').disabled = false;
-            
-            document.getElementById('statusMessage').textContent = 
-                `Ảnh đã chụp lúc ${new Date().toLocaleTimeString()}`;
+        // Chụp ảnh
+        captureBtn.addEventListener('click', () => {
+            capturedImage.src = 'http://192.168.1.101/capture?' + new Date().getTime();
+            capturedImage.style.display = 'block';
         });
 
-        // Xử lý nút tải ảnh
-        document.getElementById('downloadBtn').addEventListener('click', function() {
-            if (capturedImageUrl) {
-                const link = document.createElement('a');
-                link.href = capturedImageUrl;
-                link.download = `esp32-cam_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                document.getElementById('statusMessage').textContent = 
-                    `Đã tải ảnh thành công!`;
-            }
+        // Điều khiển flash
+        flashBtn.addEventListener('click', () => {
+            fetch('http://192.168.1.101/flash')
+                .then(response => response.text())
+                .then(state => {
+                    flashBtn.textContent = state === 'ON' ? 'Tắt Flash' : 'Bật Flash';
+                });
         });
 
-        // Xử lý nút làm mới
-        document.getElementById('refreshBtn').addEventListener('click', function() {
-            const videoStream = document.getElementById('videoStream');
-            videoStream.src = videoStream.src + '?' + new Date().getTime();
-            
-            document.getElementById('statusMessage').textContent = 
-                `Đã làm mới stream thành công!`;
-        });
-
-        // Kiểm tra kết nối
-        window.addEventListener('load', function() {
-            const videoStream = document.getElementById('videoStream');
-            videoStream.onerror = function() {
-                document.getElementById('statusMessage').textContent = 
-                    'Lỗi kết nối với ESP32-CAM. Vui lòng kiểm tra lại!';
-                document.getElementById('statusMessage').style.color = 'red';
-            };
-        });
+        // Tự động làm mới stream nếu bị mất kết nối
+        video.onerror = function() {
+            setTimeout(() => {
+                video.src = 'http://192.168.1.101/stream?' + new Date().getTime();
+            }, 1000);
+        };
     </script>
 </body>
 </html>
